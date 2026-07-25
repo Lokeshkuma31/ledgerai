@@ -3,6 +3,7 @@
 import { generateText } from "@/lib/ai/provider";
 import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
+import type { BudgetStatus } from "@/types/budget";
 import type { Transaction } from "@/types/transaction";
 
 export interface MemoryStats {
@@ -22,6 +23,8 @@ export interface CoachInput {
   recentTransactions: Transaction[];
   memoryStats: MemoryStats;
   reviewStats: ReviewStats;
+  /** Already-computed by the Budget Engine — the LLM must not recalculate these. */
+  budgetStatuses: BudgetStatus[];
 }
 
 export interface CoachOutput {
@@ -67,6 +70,16 @@ function buildAnalyticsPayload(input: CoachInput) {
       reviewedCount: input.reviewStats.reviewedCount,
       pendingCount: input.reviewStats.pendingCount,
     },
+    budgets: input.budgetStatuses.map((b) => ({
+      category: b.category,
+      monthlyLimit: b.monthlyLimit,
+      currentSpend: b.currentSpend,
+      remainingAmount: b.remainingAmount,
+      percentageUsed: Math.round(b.percentageUsed * 10) / 10,
+      transactionCount: b.transactionCount,
+      daysRemainingThisMonth: b.daysRemainingThisMonth,
+      status: b.status,
+    })),
   };
 }
 
@@ -74,6 +87,7 @@ function buildPrompt(analytics: ReturnType<typeof buildAnalyticsPayload>): strin
   return [
     "You are a financial coach analyzing a user's already-categorized spending data.",
     "Do not classify or re-categorize transactions — categorization is already finalized upstream.",
+    "The `budgets` field, if present, was computed by a deterministic budget engine — treat currentSpend, remainingAmount, percentageUsed, and status as already-correct facts. Do not recalculate, second-guess, or restate them as approximations; only explain what they mean and what to do about them.",
     "Your job is only to explain spending patterns and give personalized, actionable financial advice based on the structured analytics below.",
     "",
     "Analytics (JSON):",

@@ -13,14 +13,17 @@ import {
 import { getMemoryEntries } from "@/lib/ai/memory";
 import { generateInsights } from "@/lib/insights/engine";
 import { generateTimeline } from "@/lib/timeline/engine";
+import type { BudgetStatus } from "@/types/budget";
 import type { Transaction } from "@/types/transaction";
 
 type Status = "idle" | "loading" | "error";
 
 export default function AICoachCard({
   transactions,
+  budgetStatuses,
 }: {
   transactions: Transaction[];
+  budgetStatuses: BudgetStatus[];
 }) {
   const [output, setOutput] = useState<CoachOutput | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -33,7 +36,11 @@ export default function AICoachCard({
     }
 
     const memoryEntries = getMemoryEntries();
-    const signature = computeCoachSignature(transactions, memoryEntries.length);
+    const signature = computeCoachSignature(
+      transactions,
+      memoryEntries.length,
+      budgetStatuses,
+    );
 
     const cached = loadCoachCache();
     if (cached && cached.signature === signature) {
@@ -58,6 +65,7 @@ export default function AICoachCard({
         reviewedCount,
         pendingCount: transactions.length - reviewedCount,
       },
+      budgetStatuses,
     })
       .then((result) => {
         setOutput(result);
@@ -70,7 +78,7 @@ export default function AICoachCard({
       .finally(() => {
         inFlightSignature.current = null;
       });
-  }, [transactions]);
+  }, [transactions, budgetStatuses]);
 
   if (transactions.length === 0) return null;
 
