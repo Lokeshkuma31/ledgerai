@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AddExpenseDialog from "@/components/AddExpenseDialog";
+import AICoachCard from "@/components/AICoachCard";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
 import DashboardSummary from "@/components/DashboardSummary";
 import InsightsSummary from "@/components/InsightsSummary";
@@ -59,6 +60,7 @@ export default function TransactionList() {
           </>
         )}
       </div>
+      <AICoachCard transactions={transactions} />
       {transactions.length === 0 ? (
         <Card>
           <CardContent>
