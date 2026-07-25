@@ -1,5 +1,6 @@
 import Link from "next/link";
-import TransactionList from "@/components/TransactionList";
+import DashboardLayout from "@/components/DashboardLayout";
+import DashboardProvider from "@/components/DashboardProvider";
 
 export default function DashboardPage() {
   return (
@@ -13,7 +14,9 @@ export default function DashboardPage() {
           Memory
         </Link>
       </div>
-      <TransactionList />
+      <DashboardProvider>
+        <DashboardLayout />
+      </DashboardProvider>
     </main>
   );
 }

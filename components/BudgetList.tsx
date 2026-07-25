@@ -5,15 +5,13 @@ import BudgetDialog from "@/components/BudgetDialog";
 import type { Budget, BudgetStatus } from "@/types/budget";
 
 export default function BudgetList({
-  budgets,
   statuses,
   onBudgetsChange,
 }: {
-  budgets: Budget[];
   statuses: BudgetStatus[];
   onBudgetsChange: (budgets: Budget[]) => void;
 }) {
-  const existingCategories = budgets.map((b) => b.category);
+  const existingCategories = statuses.map((s) => s.category);
 
   if (statuses.length === 0) {
     return (
