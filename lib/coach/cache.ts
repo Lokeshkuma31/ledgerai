@@ -10,20 +10,22 @@ interface CoachCache {
 
 /**
  * Changes whenever a transaction is added, reviewed, its category changes,
- * or a budget is created/updated/deleted — the only conditions under which
- * the coach should regenerate.
+ * a budget is created/updated/deleted, or the set of active recommendations
+ * changes (dismissed/completed) — the only conditions under which the coach
+ * should regenerate.
  */
 export function computeCoachSignature(
   transactions: Transaction[],
   memoryEntryCount: number,
   budgets: { id: string; monthlyLimit: number }[] = [],
+  recommendationIds: string[] = [],
 ): string {
   const txParts = transactions.map(
     (t) =>
       `${t.id}:${t.reviewed ? 1 : 0}:${t.userCategory ?? t.aiCategory ?? ""}`,
   );
   const budgetParts = budgets.map((b) => `${b.id}:${b.monthlyLimit}`);
-  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}`;
+  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}`;
 }
 
 export function loadCoachCache(): CoachCache | null {
