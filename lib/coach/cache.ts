@@ -13,9 +13,11 @@ interface CoachCache {
  * a budget is created/updated/deleted, the set of active recommendations
  * changes (dismissed/completed), a merchant is merged/deleted (which
  * changes what the Coach sees in `merchantSummaries` without necessarily
- * touching any transaction), or a recurring item's status changes (e.g.
- * Upcoming -> Missed purely because time passed, with no new transaction)
- * — the only conditions under which the coach should regenerate.
+ * touching any transaction), a recurring item's status changes (e.g.
+ * Upcoming -> Missed purely because time passed, with no new transaction),
+ * or the calendar day changes (the Forecast Engine's days-remaining and
+ * confidence shift daily even with no new data) — the only conditions
+ * under which the coach should regenerate.
  */
 export function computeCoachSignature(
   transactions: Transaction[],
@@ -24,13 +26,14 @@ export function computeCoachSignature(
   recommendationIds: string[] = [],
   merchantIds: string[] = [],
   recurringStatuses: string[] = [],
+  forecastDay: string = "",
 ): string {
   const txParts = transactions.map(
     (t) =>
       `${t.id}:${t.reviewed ? 1 : 0}:${t.userCategory ?? t.aiCategory ?? ""}`,
   );
   const budgetParts = budgets.map((b) => `${b.id}:${b.monthlyLimit}`);
-  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}`;
+  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}`;
 }
 
 export function loadCoachCache(): CoachCache | null {

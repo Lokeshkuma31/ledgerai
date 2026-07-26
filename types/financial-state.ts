@@ -3,6 +3,7 @@ import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { CashFlowForecast, ForecastStatistics } from "@/types/forecast";
 import type { Recommendation } from "@/types/recommendation";
 import type { RecurringStatistics, RecurringTransaction } from "@/types/recurring";
 
@@ -32,6 +33,9 @@ export interface FinancialState {
   /** Recurring Transaction Intelligence Engine output. */
   recurring: RecurringTransaction[];
   recurringStatistics: RecurringStatistics;
+  /** Cash Flow Forecast Engine output. */
+  forecast: CashFlowForecast;
+  forecastStatistics: ForecastStatistics;
   coachSummary: CoachOutput | null;
   reviewStats: ReviewStats;
   memoryStats: MemoryStats;

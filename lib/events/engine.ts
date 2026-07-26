@@ -1,5 +1,6 @@
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { CashFlowForecast, ForecastStatistics } from "@/types/forecast";
 import type { RecurringTransaction } from "@/types/recurring";
 import type { Transaction } from "@/types/transaction";
 
@@ -10,6 +11,9 @@ const RECURRING_MAX_GAP_DAYS = 35;
 const MULTIPLE_EXPENSES_SAME_DAY_THRESHOLD = 5;
 const HIGH_SPENDING_DAY_MULTIPLIER = 2;
 const SALARY_KEYWORDS = ["salary", "paycheck", "income"];
+const FORECAST_RISK_UTILIZATION_THRESHOLD = 1.0; // avg projected budget use > 100%
+const INCOME_SHORTFALL_GROWTH_THRESHOLD = -0.1; // income projected down >10% vs last month
+const UNEXPECTED_SPENDING_TREND_THRESHOLD = 0.25; // expenses shifted >25% vs last month
 
 export interface DetectFinancialEventsOptions {
   /** Budget Engine output — required for Budget Exceeded / Budget Warning events. */
@@ -24,6 +28,13 @@ export interface DetectFinancialEventsOptions {
     items: RecurringTransaction[];
     newlyDetected: RecurringTransaction[];
     amountChanges: { item: RecurringTransaction; previousAmount: number }[];
+  };
+  /** Cash Flow Forecast Engine output — required for the forecast/cash-flow
+   * events. This engine only explains what the forecast already
+   * concluded; it never recomputes projections itself. */
+  forecast?: {
+    forecast: CashFlowForecast;
+    statistics: ForecastStatistics;
   };
   now?: Date;
 }
@@ -479,6 +490,127 @@ function detectRecurringAmountChanged(
   }));
 }
 
+/**
+ * The six forecast/cash-flow event types below only explain what the Cash
+ * Flow Forecast Engine already concluded — this engine never recomputes
+ * projections, risk levels, or growth figures itself.
+ */
+function detectForecastRiskIncreased(
+  forecast: CashFlowForecast,
+  statistics: ForecastStatistics,
+  now: Date,
+): FinancialEvent[] {
+  if (statistics.budgetUtilizationForecast <= FORECAST_RISK_UTILIZATION_THRESHOLD) return [];
+  const today = formatDate(now);
+  return [
+    {
+      id: `forecast-risk-increased:${today}`,
+      type: "forecast-risk-increased",
+      title: "Forecast risk increased",
+      description: `Across your budgeted categories, projected spending now averages ${Math.round(statistics.budgetUtilizationForecast * 100)}% of budget for the month.`,
+      date: today,
+      severity: "warning",
+      relatedTransactionIds: [],
+      metadata: { budgetUtilizationForecast: statistics.budgetUtilizationForecast },
+      createdAt: now.toISOString(),
+    },
+  ];
+}
+
+function detectBudgetLikelyExceeded(forecast: CashFlowForecast, now: Date): FinancialEvent[] {
+  const today = formatDate(now);
+  return forecast.categoryProjections
+    .filter((c) => c.riskLevel === "High Risk" || c.riskLevel === "Critical")
+    .map((c) => ({
+      id: `budget-likely-exceeded:${c.category}`,
+      type: "budget-likely-exceeded" as const,
+      title: `Budget likely to be exceeded for ${c.category}`,
+      description: `${c.category} is projected to reach ${Math.round(c.projectedPercentageUsed ?? 0)}% of its ${formatCurrency(c.budgetLimit ?? 0)} budget by month-end.`,
+      date: today,
+      severity: c.riskLevel === "Critical" ? "critical" : ("important" as const),
+      relatedTransactionIds: [],
+      metadata: {
+        category: c.category,
+        projectedSpend: c.projectedSpend,
+        budgetLimit: c.budgetLimit,
+        riskLevel: c.riskLevel,
+      },
+      createdAt: now.toISOString(),
+    }));
+}
+
+function detectCashFlowDirection(forecast: CashFlowForecast, now: Date): FinancialEvent[] {
+  const today = formatDate(now);
+  if (forecast.expectedSavings > 0) {
+    return [
+      {
+        id: `positive-cash-flow:${today}`,
+        type: "positive-cash-flow",
+        title: "Positive cash flow projected",
+        description: `You're projected to end the month with ${formatCurrency(forecast.expectedSavings)} in savings.`,
+        date: today,
+        severity: "info",
+        relatedTransactionIds: [],
+        metadata: { expectedSavings: forecast.expectedSavings },
+        createdAt: now.toISOString(),
+      },
+    ];
+  }
+  if (forecast.expectedSavings < 0) {
+    return [
+      {
+        id: `negative-cash-flow:${today}`,
+        type: "negative-cash-flow",
+        title: "Negative cash flow projected",
+        description: `You're projected to end the month ${formatCurrency(Math.abs(forecast.expectedSavings))} short.`,
+        date: today,
+        severity: "warning",
+        relatedTransactionIds: [],
+        metadata: { expectedSavings: forecast.expectedSavings },
+        createdAt: now.toISOString(),
+      },
+    ];
+  }
+  return [];
+}
+
+function detectIncomeShortfall(statistics: ForecastStatistics, now: Date): FinancialEvent[] {
+  if (statistics.incomeGrowth > INCOME_SHORTFALL_GROWTH_THRESHOLD) return [];
+  const today = formatDate(now);
+  return [
+    {
+      id: `income-shortfall:${today}`,
+      type: "income-shortfall",
+      title: "Income shortfall projected",
+      description: `Expected income this month is down ${Math.round(Math.abs(statistics.incomeGrowth) * 100)}% versus last month.`,
+      date: today,
+      severity: "warning",
+      relatedTransactionIds: [],
+      metadata: { incomeGrowth: statistics.incomeGrowth },
+      createdAt: now.toISOString(),
+    },
+  ];
+}
+
+function detectUnexpectedSpendingTrend(statistics: ForecastStatistics, now: Date): FinancialEvent[] {
+  if (Math.abs(statistics.expenseGrowth) <= UNEXPECTED_SPENDING_TREND_THRESHOLD) return [];
+  const today = formatDate(now);
+  const direction = statistics.expenseGrowth > 0 ? "up" : "down";
+  return [
+    {
+      id: `unexpected-spending-trend:${today}`,
+      type: "unexpected-spending-trend",
+      title: "Unexpected spending trend",
+      description: `Projected expenses are ${direction} ${Math.round(Math.abs(statistics.expenseGrowth) * 100)}% versus last month.`,
+      date: today,
+      severity: "info",
+      relatedTransactionIds: [],
+      metadata: { expenseGrowth: statistics.expenseGrowth },
+      createdAt: now.toISOString(),
+    },
+  ];
+}
+
 function sortByDateDesc(events: FinancialEvent[]): FinancialEvent[] {
   return [...events].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
@@ -500,6 +632,7 @@ export function detectFinancialEvents(
   const threshold = options.largeExpenseThreshold ?? DEFAULT_LARGE_EXPENSE_THRESHOLD;
   const budgetStatuses = options.budgetStatuses ?? [];
   const recurring = options.recurring;
+  const forecast = options.forecast;
 
   const events: FinancialEvent[] = [
     ...detectLargeExpenses(transactions, threshold, now),
@@ -518,6 +651,15 @@ export function detectFinancialEvents(
           ...detectRecurringPaymentMissed(recurring.items, now),
           ...detectNewSubscription(recurring.newlyDetected, now),
           ...detectRecurringAmountChanged(recurring.amountChanges, now),
+        ]
+      : []),
+    ...(forecast
+      ? [
+          ...detectForecastRiskIncreased(forecast.forecast, forecast.statistics, now),
+          ...detectBudgetLikelyExceeded(forecast.forecast, now),
+          ...detectCashFlowDirection(forecast.forecast, now),
+          ...detectIncomeShortfall(forecast.statistics, now),
+          ...detectUnexpectedSpendingTrend(forecast.statistics, now),
         ]
       : []),
   ];

@@ -7,13 +7,17 @@ import AICoachCard from "@/components/AICoachCard";
 import BudgetList from "@/components/BudgetList";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
 import CompletedRecommendations from "@/components/CompletedRecommendations";
+import DailySpendCard from "@/components/DailySpendCard";
 import DashboardSummary from "@/components/DashboardSummary";
 import { useDashboard } from "@/components/DashboardProvider";
 import FinancialEvents from "@/components/FinancialEvents";
+import ForecastCard from "@/components/ForecastCard";
+import ForecastTable from "@/components/ForecastTable";
 import ImportDialog from "@/components/ImportDialog";
 import InsightsSummary from "@/components/InsightsSummary";
 import RecommendationList from "@/components/RecommendationList";
 import RecurringList from "@/components/RecurringList";
+import ScenarioSimulator from "@/components/ScenarioSimulator";
 import TimelineSection from "@/components/TimelineSection";
 import { completeRecommendation, dismissRecommendation } from "@/lib/decision/storage";
 import { reviewTransaction } from "@/lib/storage";
@@ -81,6 +85,22 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
         <h2 className="text-lg font-semibold tracking-tight">Budgets</h2>
         <BudgetList statuses={state.budgets} onBudgetsChange={refresh} />
       </div>
+      {hasTransactions && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Cash Flow Forecast
+          </h2>
+          <ForecastCard forecast={state.forecast} />
+          <DailySpendCard forecast={state.forecast} />
+          <ForecastTable categoryProjections={state.forecast.categoryProjections} />
+          <ScenarioSimulator
+            budgetStatuses={state.budgets}
+            recurring={state.recurring}
+            insights={state.insights}
+            timeline={state.timeline}
+          />
+        </div>
+      )}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight">

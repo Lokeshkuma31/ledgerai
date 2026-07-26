@@ -13,7 +13,13 @@ export type FinancialEventType =
   | "salary-expected"
   | "recurring-payment-missed"
   | "new-subscription-detected"
-  | "recurring-amount-changed";
+  | "recurring-amount-changed"
+  | "forecast-risk-increased"
+  | "budget-likely-exceeded"
+  | "positive-cash-flow"
+  | "negative-cash-flow"
+  | "income-shortfall"
+  | "unexpected-spending-trend";
 
 export type FinancialEventSeverity =
   | "info"

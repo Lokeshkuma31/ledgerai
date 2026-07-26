@@ -12,6 +12,8 @@ import {
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
+import { generateForecast } from "@/lib/forecast/engine";
+import { computeForecastStatistics } from "@/lib/forecast/statistics";
 import { generateInsights, type Insights } from "@/lib/insights/engine";
 import { getAllMerchantProfiles } from "@/lib/merchant/knowledge";
 import { detectRecurringTransactions } from "@/lib/recurring/engine";
@@ -22,6 +24,7 @@ import type { MemoryEntry } from "@/lib/ai/memory";
 import type { MerchantProfile } from "@/types/merchant-profile";
 import type { Budget, BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { CashFlowForecast, ForecastCoachSummary, ForecastStatistics } from "@/types/forecast";
 import type { FinancialState } from "@/types/financial-state";
 import type { RecurringCoachSummary, RecurringStatistics } from "@/types/recurring";
 import type { Recommendation } from "@/types/recommendation";
@@ -61,12 +64,38 @@ function emptyRecurringStatistics(): RecurringStatistics {
   };
 }
 
+function emptyForecast(now: Date): CashFlowForecast {
+  return {
+    currentBalanceEstimate: 0,
+    projectedEndOfMonthBalance: 0,
+    expectedIncome: 0,
+    expectedExpenses: 0,
+    expectedSavings: 0,
+    dailySafeSpend: 0,
+    confidence: 0,
+    forecastGeneratedAt: now.toISOString(),
+    daysRemaining: 0,
+    categoryProjections: [],
+  };
+}
+
+function emptyForecastStatistics(): ForecastStatistics {
+  return {
+    forecastAccuracy: null,
+    savingsRate: 0,
+    expenseGrowth: 0,
+    incomeGrowth: 0,
+    netCashFlow: 0,
+    budgetUtilizationForecast: 0,
+  };
+}
+
 /**
  * Financial Intelligence Orchestrator.
  *
  * Runs the existing engines in dependency order — Timeline → Insights →
- * Budget → Merchant Knowledge → Recurring → Events → Decision → AI Coach —
- * and assembles their output into a single FinancialState. Each engine
+ * Budget → Merchant Knowledge → Recurring → Forecast → Events → Decision →
+ * AI Coach — and assembles their output into a single FinancialState. Each engine
  * still owns its own calculations; this function only sequences the calls
  * and shapes the result. If one engine fails, the others still run where
  * their inputs don't depend on the failed step, and the failure is
@@ -138,11 +167,26 @@ export async function buildFinancialState(
     warnings.push("Recurring statistics unavailable.");
   }
 
+  let forecast: CashFlowForecast = emptyForecast(now);
+  try {
+    forecast = generateForecast(transactions, recurring, budgetStatuses, insights, timeline, now);
+  } catch {
+    warnings.push("Cash Flow Forecast Engine unavailable.");
+  }
+
+  let forecastStatistics: ForecastStatistics = emptyForecastStatistics();
+  try {
+    forecastStatistics = computeForecastStatistics(forecast, transactions, now);
+  } catch {
+    warnings.push("Forecast statistics unavailable.");
+  }
+
   let events: FinancialEvent[] = [];
   try {
     events = detectFinancialEvents(transactions, {
       budgetStatuses,
       recurring: recurringReconciliation,
+      forecast: { forecast, statistics: forecastStatistics },
       now,
     });
   } catch {
@@ -199,6 +243,24 @@ export async function buildFinancialState(
     isIncome: r.isIncome,
   }));
 
+  const forecastSummary: ForecastCoachSummary | null =
+    transactions.length > 0
+      ? {
+          projectedEndOfMonthBalance: forecast.projectedEndOfMonthBalance,
+          expectedIncome: forecast.expectedIncome,
+          expectedExpenses: forecast.expectedExpenses,
+          expectedSavings: forecast.expectedSavings,
+          dailySafeSpend: forecast.dailySafeSpend,
+          confidence: forecast.confidence,
+          daysRemaining: forecast.daysRemaining,
+          categoryRisks: forecast.categoryProjections.map((c) => ({
+            category: c.category,
+            riskLevel: c.riskLevel,
+            projectedPercentageUsed: c.projectedPercentageUsed,
+          })),
+        }
+      : null;
+
   let coachSummary: CoachOutput | null = null;
   if (transactions.length > 0) {
     try {
@@ -209,6 +271,7 @@ export async function buildFinancialState(
         activeRecommendations.map((r) => r.id),
         merchantSummaries.map((m) => m.canonicalName),
         recurring.map((r) => `${r.id}:${r.status}`),
+        forecast.forecastGeneratedAt.slice(0, 10),
       );
       const cached = loadCoachCache();
       if (cached && cached.signature === signature) {
@@ -220,6 +283,7 @@ export async function buildFinancialState(
           recentTransactions: transactions.slice(0, 10),
           merchantSummaries,
           recurringSummaries,
+          forecastSummary,
           memoryStats,
           reviewStats,
           budgetStatuses,
@@ -253,6 +317,8 @@ export async function buildFinancialState(
     recommendations,
     recurring,
     recurringStatistics,
+    forecast,
+    forecastStatistics,
     coachSummary,
     reviewStats,
     memoryStats,
