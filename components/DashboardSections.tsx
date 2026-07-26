@@ -10,6 +10,7 @@ import CompletedRecommendations from "@/components/CompletedRecommendations";
 import DailySpendCard from "@/components/DailySpendCard";
 import DashboardSummary from "@/components/DashboardSummary";
 import { useDashboard } from "@/components/DashboardProvider";
+import FinancialCopilot from "@/components/FinancialCopilot";
 import FinancialEvents from "@/components/FinancialEvents";
 import ForecastCard from "@/components/ForecastCard";
 import ForecastTable from "@/components/ForecastTable";
@@ -133,6 +134,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
         <CompletedRecommendations recommendations={completedRecommendations} />
       </div>
       <AICoachCard summary={state.coachSummary} />
+      <FinancialCopilot state={state} />
       {!hasTransactions ? (
         <Card>
           <CardContent>

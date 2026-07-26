@@ -6,6 +6,7 @@ import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
 import type { ForecastCoachSummary } from "@/types/forecast";
+import type { QueryContext, QueryIntent } from "@/types/query";
 import type { RecurringCoachSummary } from "@/types/recurring";
 import type { Recommendation } from "@/types/recommendation";
 import type { Transaction } from "@/types/transaction";
@@ -224,4 +225,53 @@ export async function generateFinancialSummary(
   const prompt = buildPrompt(analytics);
   const raw = await generateText(prompt);
   return parseCoachResponse(raw);
+}
+
+function buildQueryPrompt(question: string, intent: QueryIntent, context: QueryContext): string {
+  return [
+    "You are a financial coach answering a user's direct question about their own finances.",
+    "The `context` JSON below was already retrieved and computed by a deterministic Financial Query Engine — it queried the appropriate engines (transactions, budgets, merchants, recurring items, forecast, events, or recommendations) and assembled exactly the data needed to answer this question.",
+    "You have NEVER seen the user's raw transaction database and cannot search it. Answer using ONLY the numbers and facts present in `context`. If `context` doesn't contain enough information to answer, say so plainly rather than guessing or inventing figures.",
+    `The engine classified this question's intent as "${intent}".`,
+    "Do not recalculate, second-guess, or contradict any number in `context` — it is already correct. Your job is only to explain it in clear, natural, conversational language, as a direct answer to the user's question.",
+    "All amounts are in Indian Rupees — use the ₹ symbol, never $.",
+    "",
+    `Question: ${question}`,
+    "",
+    "Context (JSON):",
+    JSON.stringify(context),
+    "",
+    "Respond with ONLY a single JSON object, no markdown, no code fences, no commentary outside the JSON, matching exactly this shape:",
+    '{"answer": string}',
+    "- answer: a direct, conversational, plain-language answer to the question — a sentence or two, not a report. Use the actual numbers from context where relevant.",
+  ].join("\n");
+}
+
+function parseQueryResponse(raw: string): string {
+  const parsed: unknown = JSON.parse(stripCodeFence(raw));
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Query response was not a JSON object");
+  }
+  const { answer } = parsed as Record<string, unknown>;
+  if (typeof answer !== "string") {
+    throw new Error("Query response did not match the expected shape");
+  }
+  return answer;
+}
+
+/**
+ * The AI Financial Coach's query-answering half: takes the structured
+ * context the Query Engine already retrieved and turns it into a
+ * conversational answer. The LLM never sees a transaction list it wasn't
+ * explicitly handed, and never performs a calculation — every number in
+ * its answer must trace back to `context`.
+ */
+export async function answerFinancialQuery(
+  question: string,
+  intent: QueryIntent,
+  context: QueryContext,
+): Promise<string> {
+  const prompt = buildQueryPrompt(question, intent, context);
+  const raw = await generateText(prompt);
+  return parseQueryResponse(raw);
 }
