@@ -1,8 +1,7 @@
 import Link from "next/link";
-import MerchantDirectory from "@/components/MerchantDirectory";
-import MerchantStatistics from "@/components/MerchantStatistics";
+import RecurringOverview from "@/components/RecurringOverview";
 
-export default function MerchantsPage() {
+export default function RecurringPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 px-6 py-16">
       <div className="flex flex-col gap-1">
@@ -12,14 +11,13 @@ export default function MerchantsPage() {
         >
           ← Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Merchants</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Recurring</h1>
         <p className="text-muted-foreground text-sm">
-          Every merchant LedgerAI has recognized in your transaction notes,
-          normalized into a single canonical identity.
+          Subscriptions and recurring income or expenses, detected
+          automatically from your transaction history.
         </p>
       </div>
-      <MerchantStatistics />
-      <MerchantDirectory />
+      <RecurringOverview />
     </main>
   );
 }

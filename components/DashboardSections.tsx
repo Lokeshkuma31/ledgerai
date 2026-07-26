@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import AddExpenseDialog from "@/components/AddExpenseDialog";
 import AICoachCard from "@/components/AICoachCard";
@@ -12,6 +13,7 @@ import FinancialEvents from "@/components/FinancialEvents";
 import ImportDialog from "@/components/ImportDialog";
 import InsightsSummary from "@/components/InsightsSummary";
 import RecommendationList from "@/components/RecommendationList";
+import RecurringList from "@/components/RecurringList";
 import TimelineSection from "@/components/TimelineSection";
 import { completeRecommendation, dismissRecommendation } from "@/lib/decision/storage";
 import { reviewTransaction } from "@/lib/storage";
@@ -78,6 +80,20 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">Budgets</h2>
         <BudgetList statuses={state.budgets} onBudgetsChange={refresh} />
+      </div>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Recurring Transactions
+          </h2>
+          <Link
+            href="/recurring"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        <RecurringList items={state.recurring} />
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">

@@ -13,6 +13,11 @@ const TYPE_ICONS: Record<FinancialEventType, string> = {
   "high-spending-day": "📈",
   "weekend-spending": "🏖️",
   "no-spending-day": "🌙",
+  "subscription-renewing": "🔄",
+  "salary-expected": "🗓️",
+  "recurring-payment-missed": "⛔",
+  "new-subscription-detected": "✨",
+  "recurring-amount-changed": "📊",
 };
 
 function formatEventDate(dateStr: string, now: Date): string {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -19,13 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import MerchantDirectoryFilters, {
+  type MerchantDirectoryFilterState,
+} from "@/components/MerchantDirectoryFilters";
+import MerchantKnowledgeBadge from "@/components/MerchantKnowledgeBadge";
 import {
-  deleteMerchant,
-  getAllMerchants,
-  mergeMerchant,
-} from "@/lib/merchant/registry";
+  getAllMerchantProfiles,
+  refreshMerchantKnowledge,
+  removeMerchantKnowledge,
+} from "@/lib/merchant/knowledge";
+import { deleteMerchant, mergeMerchant } from "@/lib/merchant/registry";
 import { clearMerchantFromTransactions, reassignMerchant } from "@/lib/storage";
-import type { Merchant } from "@/types/merchant";
+import type { MerchantProfile } from "@/types/merchant-profile";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -35,13 +41,17 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatAmount(amount: number): string {
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
+
 function MergeDialog({
   merchant,
   candidates,
   onMerged,
 }: {
-  merchant: Merchant;
-  candidates: Merchant[];
+  merchant: MerchantProfile;
+  candidates: MerchantProfile[];
   onMerged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +67,8 @@ function MergeDialog({
     if (!target) return;
     mergeMerchant(merchant.id, target.id);
     reassignMerchant(merchant.id, target.id, target.canonicalName);
+    removeMerchantKnowledge(merchant.id);
+    refreshMerchantKnowledge(target.id);
     setOpen(false);
     onMerged();
   }
@@ -115,7 +127,7 @@ function DeleteDialog({
   merchant,
   onDeleted,
 }: {
-  merchant: Merchant;
+  merchant: MerchantProfile;
   onDeleted: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -123,6 +135,7 @@ function DeleteDialog({
   function handleDelete() {
     deleteMerchant(merchant.id);
     clearMerchantFromTransactions(merchant.id);
+    removeMerchantKnowledge(merchant.id);
     setOpen(false);
     onDeleted();
   }
@@ -155,84 +168,59 @@ function DeleteDialog({
   );
 }
 
-function MerchantDetailsDialog({ merchant }: { merchant: Merchant }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="ghost" size="sm">
-            View details
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{merchant.canonicalName}</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-2 py-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Category Hint</span>
-            <span>{merchant.categoryHint ?? "—"}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Transactions</span>
-            <span>{merchant.transactionCount}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Confidence</span>
-            <span>{Math.round(merchant.confidence * 100)}%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">First Seen</span>
-            <span>{formatDate(merchant.firstSeen)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Last Seen</span>
-            <span>{formatDate(merchant.lastSeen)}</span>
-          </div>
-          <div className="flex flex-col gap-1 pt-1">
-            <span className="text-muted-foreground">Aliases</span>
-            {merchant.aliases.length === 0 ? (
-              <span className="text-muted-foreground text-xs">
-                None recorded
-              </span>
-            ) : (
-              <div className="flex flex-wrap gap-1">
-                {merchant.aliases.map((alias) => (
-                  <span
-                    key={alias}
-                    className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
-                  >
-                    {alias}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline">Close</Button>} />
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const DEFAULT_FILTERS: MerchantDirectoryFilterState = {
+  search: "",
+  sortBy: "transactions",
+  category: "all",
+  industry: "all",
+};
 
 export default function MerchantDirectory() {
-  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [merchants, setMerchants] = useState<MerchantProfile[]>([]);
+  const [filters, setFilters] = useState<MerchantDirectoryFilterState>(DEFAULT_FILTERS);
 
   const refresh = useCallback(() => {
-    setMerchants(
-      [...getAllMerchants()].sort(
-        (a, b) => b.transactionCount - a.transactionCount,
-      ),
-    );
+    setMerchants(getAllMerchantProfiles());
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(merchants.map((m) => m.defaultCategory))).sort(),
+    [merchants],
+  );
+  const industries = useMemo(
+    () => Array.from(new Set(merchants.map((m) => m.industry))).sort(),
+    [merchants],
+  );
+
+  const visibleMerchants = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+    const filtered = merchants.filter((m) => {
+      if (
+        search &&
+        !m.canonicalName.toLowerCase().includes(search) &&
+        !m.aliases.some((alias) => alias.toLowerCase().includes(search))
+      ) {
+        return false;
+      }
+      if (filters.category !== "all" && m.defaultCategory !== filters.category) {
+        return false;
+      }
+      if (filters.industry !== "all" && m.industry !== filters.industry) {
+        return false;
+      }
+      return true;
+    });
+
+    return [...filtered].sort((a, b) =>
+      filters.sortBy === "spend"
+        ? b.totalSpend - a.totalSpend
+        : b.transactionCount - a.transactionCount,
+    );
+  }, [merchants, filters]);
 
   if (merchants.length === 0) {
     return (
@@ -250,62 +238,80 @@ export default function MerchantDirectory() {
 
   return (
     <div className="flex flex-col gap-4">
-      {merchants.map((merchant) => {
-        const candidates = merchants.filter((m) => m.id !== merchant.id);
-        return (
-          <Card key={merchant.id}>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <CardTitle className="text-base">
-                {merchant.canonicalName}
-              </CardTitle>
-              <span className="text-muted-foreground text-xs">
-                {Math.round(merchant.confidence * 100)}% confidence
-              </span>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <dl className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div className="flex justify-between gap-2">
-                  <dt>Category Hint</dt>
-                  <dd>{merchant.categoryHint ?? "—"}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>Transactions</dt>
-                  <dd>{merchant.transactionCount}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>First Seen</dt>
-                  <dd>{formatDate(merchant.firstSeen)}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt>Last Seen</dt>
-                  <dd>{formatDate(merchant.lastSeen)}</dd>
-                </div>
-              </dl>
-              {merchant.aliases.length > 0 && (
+      <MerchantDirectoryFilters
+        state={filters}
+        categories={categories}
+        industries={industries}
+        onChange={setFilters}
+      />
+      {visibleMerchants.length === 0 ? (
+        <Card>
+          <CardContent>
+            <p className="text-muted-foreground">
+              No merchants match these filters.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        visibleMerchants.map((merchant) => {
+          const candidates = merchants.filter((m) => m.id !== merchant.id);
+          return (
+            <Card key={merchant.id}>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <CardTitle className="text-base">
+                  {merchant.canonicalName}
+                </CardTitle>
+                <span className="text-muted-foreground text-xs">
+                  {Math.round(merchant.confidence * 100)}% confidence
+                </span>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-1">
-                  {merchant.aliases.map((alias) => (
-                    <span
-                      key={alias}
-                      className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
-                    >
-                      {alias}
-                    </span>
-                  ))}
+                  <MerchantKnowledgeBadge label={merchant.industry} />
+                  <MerchantKnowledgeBadge label={merchant.defaultCategory} tone="muted" />
+                  {merchant.isRecurringFriendly && (
+                    <MerchantKnowledgeBadge label="Recurring" tone="muted" />
+                  )}
                 </div>
-              )}
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <MerchantDetailsDialog merchant={merchant} />
-                <MergeDialog
-                  merchant={merchant}
-                  candidates={candidates}
-                  onMerged={refresh}
-                />
-                <DeleteDialog merchant={merchant} onDeleted={refresh} />
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+                <dl className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt>Transactions</dt>
+                    <dd>{merchant.transactionCount}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>Total Spend</dt>
+                    <dd>{formatAmount(merchant.totalSpend)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>First Seen</dt>
+                    <dd>{formatDate(merchant.firstSeen)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt>Last Seen</dt>
+                    <dd>{formatDate(merchant.lastSeen)}</dd>
+                  </div>
+                </dl>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/merchants/${merchant.id}`} />}
+                  >
+                    View details
+                  </Button>
+                  <MergeDialog
+                    merchant={merchant}
+                    candidates={candidates}
+                    onMerged={refresh}
+                  />
+                  <DeleteDialog merchant={merchant} onDeleted={refresh} />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }

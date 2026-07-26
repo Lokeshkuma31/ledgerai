@@ -1,5 +1,6 @@
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { RecurringTransaction } from "@/types/recurring";
 import type { Transaction } from "@/types/transaction";
 
 const DEFAULT_LARGE_EXPENSE_THRESHOLD = 500;
@@ -15,6 +16,15 @@ export interface DetectFinancialEventsOptions {
   budgetStatuses?: BudgetStatus[];
   /** Large-expense threshold. Defaults to 500. */
   largeExpenseThreshold?: number;
+  /** Recurring Transaction Intelligence Engine output — required for the
+   * subscription/recurring lifecycle events (renewing, missed, new, amount
+   * changed). This engine only explains what it's given; it never
+   * re-detects recurrence itself. */
+  recurring?: {
+    items: RecurringTransaction[];
+    newlyDetected: RecurringTransaction[];
+    amountChanges: { item: RecurringTransaction; previousAmount: number }[];
+  };
   now?: Date;
 }
 
@@ -374,6 +384,101 @@ function detectNoSpendingDay(
   ];
 }
 
+/**
+ * The five recurring-lifecycle event types below only explain what the
+ * Recurring Transaction Intelligence Engine already decided — this engine
+ * never re-derives frequency, status, or "new"/"changed" itself.
+ */
+function detectSubscriptionRenewing(
+  items: RecurringTransaction[],
+  now: Date,
+): FinancialEvent[] {
+  return items
+    .filter((r) => r.isSubscription && r.status === "Upcoming" && r.nextExpectedOccurrence)
+    .map((r) => ({
+      id: `subscription-renewing:${r.id}`,
+      type: "subscription-renewing",
+      title: "Subscription renewing soon",
+      description: `${r.title} (~${formatCurrency(r.averageAmount)}) is expected to renew on ${r.nextExpectedOccurrence}.`,
+      date: r.nextExpectedOccurrence!,
+      severity: "info",
+      relatedTransactionIds: r.relatedTransactionIds,
+      metadata: { title: r.title, averageAmount: r.averageAmount, frequency: r.frequency },
+      createdAt: now.toISOString(),
+    }));
+}
+
+function detectSalaryExpected(items: RecurringTransaction[], now: Date): FinancialEvent[] {
+  return items
+    .filter((r) => r.isIncome && r.status === "Upcoming" && r.nextExpectedOccurrence)
+    .map((r) => ({
+      id: `salary-expected:${r.id}`,
+      type: "salary-expected",
+      title: "Income expected soon",
+      description: `${r.title} (~${formatCurrency(r.averageAmount)}) is expected around ${r.nextExpectedOccurrence}.`,
+      date: r.nextExpectedOccurrence!,
+      severity: "info",
+      relatedTransactionIds: r.relatedTransactionIds,
+      metadata: { title: r.title, averageAmount: r.averageAmount },
+      createdAt: now.toISOString(),
+    }));
+}
+
+function detectRecurringPaymentMissed(
+  items: RecurringTransaction[],
+  now: Date,
+): FinancialEvent[] {
+  return items
+    .filter((r) => r.status === "Missed")
+    .map((r) => ({
+      id: `recurring-payment-missed:${r.id}`,
+      type: "recurring-payment-missed",
+      title: r.isIncome ? "Expected income overdue" : "Recurring payment missed",
+      description: `${r.title} (~${formatCurrency(r.averageAmount)}) was expected around ${r.nextExpectedOccurrence} and hasn't been recorded yet.`,
+      date: r.nextExpectedOccurrence ?? formatDate(now),
+      severity: r.isIncome ? "warning" : "important",
+      relatedTransactionIds: r.relatedTransactionIds,
+      metadata: { title: r.title, averageAmount: r.averageAmount },
+      createdAt: now.toISOString(),
+    }));
+}
+
+function detectNewSubscription(
+  newlyDetected: RecurringTransaction[],
+  now: Date,
+): FinancialEvent[] {
+  return newlyDetected
+    .filter((r) => r.isSubscription)
+    .map((r) => ({
+      id: `new-subscription-detected:${r.id}`,
+      type: "new-subscription-detected",
+      title: "New subscription detected",
+      description: `${r.title} looks like a new ${r.frequency.toLowerCase()} subscription at ~${formatCurrency(r.averageAmount)}.`,
+      date: r.lastOccurrence,
+      severity: "info",
+      relatedTransactionIds: r.relatedTransactionIds,
+      metadata: { title: r.title, averageAmount: r.averageAmount, frequency: r.frequency },
+      createdAt: now.toISOString(),
+    }));
+}
+
+function detectRecurringAmountChanged(
+  amountChanges: { item: RecurringTransaction; previousAmount: number }[],
+  now: Date,
+): FinancialEvent[] {
+  return amountChanges.map(({ item, previousAmount }) => ({
+    id: `recurring-amount-changed:${item.id}:${item.lastOccurrence}`,
+    type: "recurring-amount-changed",
+    title: "Recurring amount changed",
+    description: `${item.title} changed from ${formatCurrency(previousAmount)} to ${formatCurrency(item.lastAmount)}.`,
+    date: item.lastOccurrence,
+    severity: "warning",
+    relatedTransactionIds: item.relatedTransactionIds,
+    metadata: { title: item.title, previousAmount, newAmount: item.lastAmount },
+    createdAt: now.toISOString(),
+  }));
+}
+
 function sortByDateDesc(events: FinancialEvent[]): FinancialEvent[] {
   return [...events].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
@@ -394,6 +499,7 @@ export function detectFinancialEvents(
   const now = options.now ?? new Date();
   const threshold = options.largeExpenseThreshold ?? DEFAULT_LARGE_EXPENSE_THRESHOLD;
   const budgetStatuses = options.budgetStatuses ?? [];
+  const recurring = options.recurring;
 
   const events: FinancialEvent[] = [
     ...detectLargeExpenses(transactions, threshold, now),
@@ -405,6 +511,15 @@ export function detectFinancialEvents(
     ...detectHighSpendingDays(transactions, now),
     ...detectWeekendSpending(transactions, now),
     ...detectNoSpendingDay(transactions, now),
+    ...(recurring
+      ? [
+          ...detectSubscriptionRenewing(recurring.items, now),
+          ...detectSalaryExpected(recurring.items, now),
+          ...detectRecurringPaymentMissed(recurring.items, now),
+          ...detectNewSubscription(recurring.newlyDetected, now),
+          ...detectRecurringAmountChanged(recurring.amountChanges, now),
+        ]
+      : []),
   ];
 
   return sortByDateDesc(events);

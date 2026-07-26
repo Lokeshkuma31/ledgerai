@@ -8,7 +8,12 @@ export type FinancialEventType =
   | "new-merchant"
   | "high-spending-day"
   | "weekend-spending"
-  | "no-spending-day";
+  | "no-spending-day"
+  | "subscription-renewing"
+  | "salary-expected"
+  | "recurring-payment-missed"
+  | "new-subscription-detected"
+  | "recurring-amount-changed";
 
 export type FinancialEventSeverity =
   | "info"

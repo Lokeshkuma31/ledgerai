@@ -4,6 +4,7 @@ import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
 import type { Recommendation } from "@/types/recommendation";
+import type { RecurringStatistics, RecurringTransaction } from "@/types/recurring";
 
 export interface DashboardStats {
   totalTransactions: number;
@@ -12,6 +13,7 @@ export interface DashboardStats {
   totalBudgets: number;
   activeEventCount: number;
   activeRecommendationCount: number;
+  activeRecurringCount: number;
 }
 
 /**
@@ -27,6 +29,9 @@ export interface FinancialState {
   events: FinancialEvent[];
   /** Full set (new/dismissed/completed) — the Dashboard filters for display. */
   recommendations: Recommendation[];
+  /** Recurring Transaction Intelligence Engine output. */
+  recurring: RecurringTransaction[];
+  recurringStatistics: RecurringStatistics;
   coachSummary: CoachOutput | null;
   reviewStats: ReviewStats;
   memoryStats: MemoryStats;

@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import ReviewTransactionDialog from "@/components/ReviewTransactionDialog";
+import { getMerchantProfile } from "@/lib/merchant/knowledge";
 import type { Category, Transaction } from "@/types/transaction";
 
 function formatDate(dateStr: string): string {
@@ -31,13 +32,24 @@ export default function TransactionCard({
   transaction: Transaction;
   onReview: (id: string, userCategory?: Category) => void;
 }) {
+  const industry = transaction.merchantId
+    ? getMerchantProfile(transaction.merchantId)?.industry
+    : undefined;
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-base font-semibold">
-            {transaction.merchantName ?? "Unrecognized Merchant"}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-base font-semibold">
+              {transaction.merchantName ?? "Unrecognized Merchant"}
+            </span>
+            {industry && (
+              <span className="text-muted-foreground text-[11px]">
+                {industry}
+              </span>
+            )}
+          </div>
           <span className="text-lg font-semibold">
             ₹{transaction.amount.toLocaleString("en-IN")}
           </span>

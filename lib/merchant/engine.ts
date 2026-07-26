@@ -1,3 +1,4 @@
+import { enrichMerchant } from "@/lib/merchant/knowledge";
 import { matchKnownMerchant, normalizeMerchantName } from "@/lib/merchant/normalizer";
 import { registerMerchant } from "@/lib/merchant/registry";
 
@@ -69,6 +70,7 @@ export function identifyMerchant(note: string): MerchantIdentification | undefin
     categoryHint: extraction.categoryHint,
     confidence: extraction.confidence,
   });
+  enrichMerchant(merchant);
 
   return {
     merchantId: merchant.id,
