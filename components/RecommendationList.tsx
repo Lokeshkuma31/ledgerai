@@ -1,15 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import RecommendationCard from "@/components/RecommendationCard";
+import type { ExplanationContext } from "@/types/explanation";
 import type { Recommendation } from "@/types/recommendation";
 
 export default function RecommendationList({
   recommendations,
   onDismiss,
   onComplete,
+  explanationContext,
 }: {
   recommendations: Recommendation[];
   onDismiss: (recommendation: Recommendation) => void;
   onComplete: (recommendation: Recommendation) => void;
+  explanationContext?: ExplanationContext;
 }) {
   if (recommendations.length === 0) {
     return (
@@ -31,6 +34,7 @@ export default function RecommendationList({
           recommendation={recommendation}
           onDismiss={onDismiss}
           onComplete={onComplete}
+          explanationContext={explanationContext}
         />
       ))}
     </div>

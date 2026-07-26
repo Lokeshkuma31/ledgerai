@@ -12,6 +12,7 @@ import { getBudgets } from "@/lib/budget/storage";
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
+import { explainAll } from "@/lib/explanations/engine";
 import { generateForecast } from "@/lib/forecast/engine";
 import { computeForecastStatistics } from "@/lib/forecast/statistics";
 import { generateInsights } from "@/lib/insights/engine";
@@ -33,6 +34,7 @@ import { getTransactions } from "@/lib/storage";
 import { generateTimeline } from "@/lib/timeline/engine";
 import { INDEX_OBJECT_TYPES } from "@/types/index";
 import type { FinancialIndex, RecentSearch, SearchResult } from "@/types/index";
+import type { ExplanationContext } from "@/types/explanation";
 
 const INDEX_OBJECT_TYPE_SET = new Set(INDEX_OBJECT_TYPES);
 
@@ -41,9 +43,11 @@ const INDEX_OBJECT_TYPE_SET = new Set(INDEX_OBJECT_TYPES);
  * from — the same pure engines the Dashboard's Orchestrator calls, minus
  * the AI Coach step, which a search page has no reason to invoke. Mirrors
  * the pattern RecurringOverview.tsx already uses for its own client-side
- * recompute.
+ * recompute. Also generates explanations for everything so the index can
+ * include them and each result card can offer "Why?" without a further
+ * round-trip.
  */
-function buildIndexFromStorage(): FinancialIndex {
+function buildIndexFromStorage(): { index: FinancialIndex; explanationContext: ExplanationContext } {
   const now = new Date();
   const transactions = getTransactions();
   const merchants = getAllMerchants();
@@ -67,7 +71,21 @@ function buildIndexFromStorage(): FinancialIndex {
   );
   const conversationHistory = getHistory();
 
-  return buildFinancialIndex({
+  const explanationContext: ExplanationContext = {
+    transactions,
+    budgets,
+    events,
+    recommendations,
+    recurring,
+    merchantProfiles,
+    forecast,
+    insights,
+    timeline,
+    now,
+  };
+  const explanations = explainAll(explanationContext);
+
+  const index = buildFinancialIndex({
     transactions,
     merchants,
     merchantProfiles,
@@ -79,8 +97,11 @@ function buildIndexFromStorage(): FinancialIndex {
     recurring,
     forecast,
     conversationHistory,
+    explanations,
     now,
   });
+
+  return { index, explanationContext };
 }
 
 function toSearchOptions(query: string, state: SearchFilterState) {
@@ -103,13 +124,16 @@ function toSearchOptions(query: string, state: SearchFilterState) {
 
 export default function SearchOverview() {
   const [index, setIndex] = useState<FinancialIndex | null>(null);
+  const [explanationContext, setExplanationContext] = useState<ExplanationContext | null>(null);
   const [query, setQuery] = useState("");
   const [filterState, setFilterState] = useState<SearchFilterState>(emptySearchFilterState());
   const [result, setResult] = useState<SearchResult | null>(null);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
 
   useEffect(() => {
-    setIndex(buildIndexFromStorage());
+    const built = buildIndexFromStorage();
+    setIndex(built.index);
+    setExplanationContext(built.explanationContext);
     setRecentSearches(getRecentSearches());
   }, []);
 
@@ -199,7 +223,11 @@ export default function SearchOverview() {
         ) : (
           <div className="flex flex-col gap-2">
             {result.items.map((item) => (
-              <SearchResultCard key={`${item.object.type}:${item.object.id}`} item={item} />
+              <SearchResultCard
+                key={`${item.object.type}:${item.object.id}`}
+                item={item}
+                explanationContext={explanationContext ?? undefined}
+              />
             ))}
           </div>
         )}

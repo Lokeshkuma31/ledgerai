@@ -14,6 +14,7 @@ export const INDEX_OBJECT_TYPES = [
   "recurring-transaction",
   "forecast-summary",
   "conversation",
+  "explanation",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 
@@ -58,6 +59,7 @@ export interface FinancialIndexSources {
   recurring: import("@/types/recurring").RecurringTransaction[];
   forecast: import("@/types/forecast").CashFlowForecast;
   conversationHistory: import("@/types/query").QueryResult[];
+  explanations: import("@/types/explanation").Explanation[];
   now: Date;
 }
 

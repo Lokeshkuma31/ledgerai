@@ -1,16 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import RecommendationBadge from "@/components/RecommendationBadge";
+import WhyButton from "@/components/WhyButton";
+import { explainRecommendation } from "@/lib/explanations/engine";
+import type { ExplanationContext } from "@/types/explanation";
 import type { Recommendation } from "@/types/recommendation";
 
 export default function RecommendationCard({
   recommendation,
   onDismiss,
   onComplete,
+  explanationContext,
 }: {
   recommendation: Recommendation;
   onDismiss?: (recommendation: Recommendation) => void;
   onComplete?: (recommendation: Recommendation) => void;
+  explanationContext?: ExplanationContext;
 }) {
   return (
     <Card size="sm">
@@ -30,8 +35,11 @@ export default function RecommendationCard({
             {recommendation.action}
           </span>
         </div>
-        {(onDismiss || onComplete) && (
+        {(onDismiss || onComplete || explanationContext) && (
           <div className="flex justify-end gap-2 pt-1">
+            {explanationContext && (
+              <WhyButton explain={() => explainRecommendation(recommendation, explanationContext)} />
+            )}
             {onDismiss && (
               <Button
                 variant="outline"

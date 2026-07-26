@@ -1,4 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
+import WhyButton from "@/components/WhyButton";
+import { explainRecurringTransaction } from "@/lib/explanations/engine";
+import type { ExplanationContext } from "@/types/explanation";
 import type { RecurringStatus, RecurringTransaction } from "@/types/recurring";
 
 const STATUS_STYLES: Record<RecurringStatus, string> = {
@@ -22,7 +25,13 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-export default function RecurringCard({ item }: { item: RecurringTransaction }) {
+export default function RecurringCard({
+  item,
+  explanationContext,
+}: {
+  item: RecurringTransaction;
+  explanationContext?: ExplanationContext;
+}) {
   return (
     <Card size="sm">
       <CardContent className="flex flex-col gap-1.5">
@@ -51,6 +60,11 @@ export default function RecurringCard({ item }: { item: RecurringTransaction }) 
             </span>
           </div>
         </div>
+        {explanationContext && (
+          <div className="flex justify-end">
+            <WhyButton explain={() => explainRecurringTransaction(item, explanationContext)} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AddExpenseDialog from "@/components/AddExpenseDialog";
 import AICoachCard from "@/components/AICoachCard";
@@ -21,7 +22,9 @@ import RecurringList from "@/components/RecurringList";
 import ScenarioSimulator from "@/components/ScenarioSimulator";
 import TimelineSection from "@/components/TimelineSection";
 import { completeRecommendation, dismissRecommendation } from "@/lib/decision/storage";
-import { reviewTransaction } from "@/lib/storage";
+import { getAllMerchantProfiles } from "@/lib/merchant/knowledge";
+import { getTransactions, reviewTransaction } from "@/lib/storage";
+import type { ExplanationContext } from "@/types/explanation";
 import type { FinancialState } from "@/types/financial-state";
 import type { Recommendation } from "@/types/recommendation";
 import type { Category } from "@/types/transaction";
@@ -34,6 +37,26 @@ import type { Category } from "@/types/transaction";
  */
 export default function DashboardSections({ state }: { state: FinancialState }) {
   const { refresh } = useDashboard();
+
+  // Built once per render, reused by every "Why?" button on this page —
+  // the Explanation Engine never calls storage itself, so this is the one
+  // place that assembles its context (mirroring how FinancialCopilot
+  // assembles QueryDataSources).
+  const explanationContext: ExplanationContext = useMemo(
+    () => ({
+      transactions: getTransactions(),
+      budgets: state.budgets,
+      events: state.events,
+      recommendations: state.recommendations,
+      recurring: state.recurring,
+      merchantProfiles: getAllMerchantProfiles(),
+      forecast: state.forecast,
+      insights: state.insights,
+      timeline: state.timeline,
+      now: new Date(state.generatedAt),
+    }),
+    [state],
+  );
 
   function handleReview(id: string, userCategory?: Category) {
     reviewTransaction(id, userCategory);
@@ -77,21 +100,25 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
           </Card>
         ) : (
           <>
-            <InsightsSummary insights={state.insights} />
+            <InsightsSummary insights={state.insights} explanationContext={explanationContext} />
             <CategoryBreakdown breakdown={state.insights.categoryBreakdown} />
           </>
         )}
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">Budgets</h2>
-        <BudgetList statuses={state.budgets} onBudgetsChange={refresh} />
+        <BudgetList
+          statuses={state.budgets}
+          onBudgetsChange={refresh}
+          explanationContext={explanationContext}
+        />
       </div>
       {hasTransactions && (
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold tracking-tight">
             Cash Flow Forecast
           </h2>
-          <ForecastCard forecast={state.forecast} />
+          <ForecastCard forecast={state.forecast} explanationContext={explanationContext} />
           <DailySpendCard forecast={state.forecast} />
           <ForecastTable categoryProjections={state.forecast.categoryProjections} />
           <ScenarioSimulator
@@ -114,13 +141,13 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
             View all
           </Link>
         </div>
-        <RecurringList items={state.recurring} />
+        <RecurringList items={state.recurring} explanationContext={explanationContext} />
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
           Financial Events
         </h2>
-        <FinancialEvents events={state.events} />
+        <FinancialEvents events={state.events} explanationContext={explanationContext} />
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
@@ -130,6 +157,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
           recommendations={activeRecommendations}
           onDismiss={handleDismissRecommendation}
           onComplete={handleCompleteRecommendation}
+          explanationContext={explanationContext}
         />
         <CompletedRecommendations recommendations={completedRecommendations} />
       </div>
@@ -148,6 +176,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
               key={group.key}
               group={group}
               onReview={handleReview}
+              explanationContext={explanationContext}
             />
           ))}
         </div>

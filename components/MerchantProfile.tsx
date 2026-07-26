@@ -4,8 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import MerchantKnowledgeBadge from "@/components/MerchantKnowledgeBadge";
-import { getMerchantProfile } from "@/lib/merchant/knowledge";
+import WhyButton from "@/components/WhyButton";
+import { explainMerchantProfile } from "@/lib/explanations/engine";
+import { generateForecast } from "@/lib/forecast/engine";
+import { generateInsights } from "@/lib/insights/engine";
+import { getAllMerchantProfiles, getMerchantProfile } from "@/lib/merchant/knowledge";
 import { getTransactions } from "@/lib/storage";
+import { generateTimeline } from "@/lib/timeline/engine";
+import type { ExplanationContext } from "@/types/explanation";
 import type { MerchantProfile as MerchantProfileType } from "@/types/merchant-profile";
 import type { Transaction } from "@/types/transaction";
 
@@ -33,16 +39,30 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function MerchantProfile({ merchantId }: { merchantId: string }) {
   const [profile, setProfile] = useState<MerchantProfileType | null | undefined>(undefined);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [explanationContext, setExplanationContext] = useState<ExplanationContext | null>(null);
 
   useEffect(() => {
     const found = getMerchantProfile(merchantId) ?? null;
     setProfile(found);
     if (found) {
-      setRecentTransactions(
-        getTransactions()
-          .filter((t) => t.merchantId === merchantId)
-          .slice(0, 10),
-      );
+      const transactions = getTransactions();
+      setRecentTransactions(transactions.filter((t) => t.merchantId === merchantId).slice(0, 10));
+
+      const now = new Date();
+      const insights = generateInsights(transactions);
+      const timeline = generateTimeline(transactions, now);
+      setExplanationContext({
+        transactions,
+        budgets: [],
+        events: [],
+        recommendations: [],
+        recurring: [],
+        merchantProfiles: getAllMerchantProfiles(),
+        forecast: generateForecast(transactions, [], [], insights, timeline, now),
+        insights,
+        timeline,
+        now,
+      });
     }
   }, [merchantId]);
 
@@ -64,9 +84,14 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          {profile.canonicalName}
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {profile.canonicalName}
+          </h1>
+          {explanationContext && (
+            <WhyButton explain={() => explainMerchantProfile(profile, explanationContext)} />
+          )}
+        </div>
         <div className="flex flex-wrap gap-1">
           <MerchantKnowledgeBadge label={profile.industry} />
           <MerchantKnowledgeBadge label={profile.merchantType} tone="muted" />

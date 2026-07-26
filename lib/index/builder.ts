@@ -1,4 +1,5 @@
 import type { BudgetStatus } from "@/types/budget";
+import type { Explanation } from "@/types/explanation";
 import type { FinancialEvent } from "@/types/event";
 import type { CashFlowForecast } from "@/types/forecast";
 import type { FinancialIndex, FinancialIndexSources, IndexedObject, IndexObjectType } from "@/types/index";
@@ -294,6 +295,23 @@ export function indexConversationHistory(history: QueryResult[]): IndexedObject[
   );
 }
 
+export function indexExplanations(explanations: Explanation[]): IndexedObject[] {
+  return explanations.map((e) =>
+    makeObject("explanation", {
+      id: e.id,
+      title: e.title,
+      description: e.reason,
+      keywords: [e.title, e.objectType, ...e.tags],
+      merchant: e.relatedObjects.find((r) => r.type === "merchant")?.label,
+      category: e.relatedObjects.find((r) => r.type === "category")?.label,
+      tags: e.tags,
+      metadata: { objectType: e.objectType, objectId: e.objectId, confidence: e.confidence },
+      createdAt: e.generatedAt,
+      updatedAt: e.lastUpdated,
+    }),
+  );
+}
+
 /**
  * Constructs a fresh FinancialIndex from every source the app already
  * computes — nothing here re-derives numbers the underlying engines own;
@@ -312,6 +330,7 @@ export function buildFinancialIndex(sources: FinancialIndexSources): FinancialIn
     ...indexRecurringTransactions(sources.recurring),
     ...indexForecastSummary(sources.forecast),
     ...indexConversationHistory(sources.conversationHistory),
+    ...indexExplanations(sources.explanations),
   ];
 
   const counts = {} as Record<IndexObjectType, number>;

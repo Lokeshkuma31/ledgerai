@@ -12,6 +12,12 @@ import {
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
+import {
+  explainBudget,
+  explainFinancialEvent,
+  explainForecast,
+  explainRecommendation,
+} from "@/lib/explanations/engine";
 import { generateForecast } from "@/lib/forecast/engine";
 import { computeForecastStatistics } from "@/lib/forecast/statistics";
 import { generateInsights, type Insights } from "@/lib/insights/engine";
@@ -26,6 +32,7 @@ import type { Budget, BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
 import type { CashFlowForecast, ForecastCoachSummary, ForecastStatistics } from "@/types/forecast";
 import type { FinancialState } from "@/types/financial-state";
+import type { ExplanationContext, ExplanationCoachSummary } from "@/types/explanation";
 import type { RecurringCoachSummary, RecurringStatistics } from "@/types/recurring";
 import type { Recommendation } from "@/types/recommendation";
 import type { Transaction } from "@/types/transaction";
@@ -261,6 +268,33 @@ export async function buildFinancialState(
         }
       : null;
 
+  // Financial Insight & Explanation Engine — generates the authoritative
+  // "why" for the objects the Coach is about to summarize, so the Coach
+  // narrates these instead of deriving its own reasoning from raw numbers.
+  const explanationContext: ExplanationContext = {
+    transactions,
+    budgets: budgetStatuses,
+    events,
+    recommendations,
+    recurring,
+    merchantProfiles,
+    forecast,
+    insights,
+    timeline,
+    now,
+  };
+  const explanations: ExplanationCoachSummary[] = [
+    ...budgetStatuses.map((b) => explainBudget(b, explanationContext)),
+    ...(transactions.length > 0 ? [explainForecast(explanationContext)] : []),
+    ...activeRecommendations
+      .slice(0, 10)
+      .map((r) => explainRecommendation(r, explanationContext)),
+    ...events
+      .filter((e) => e.severity === "critical" || e.severity === "important")
+      .slice(0, 5)
+      .map((e) => explainFinancialEvent(e, explanationContext)),
+  ];
+
   let coachSummary: CoachOutput | null = null;
   if (transactions.length > 0) {
     try {
@@ -289,6 +323,7 @@ export async function buildFinancialState(
           budgetStatuses,
           events,
           recommendations: activeRecommendations,
+          explanations,
         });
         saveCoachCache(signature, coachSummary);
       }

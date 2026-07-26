@@ -48,6 +48,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "recurring-transaction": "Recurring",
   "forecast-summary": "Forecast",
   conversation: "Past Questions",
+  explanation: "Explanations",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

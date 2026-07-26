@@ -1,4 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
+import WhyButton from "@/components/WhyButton";
+import { explainSearchResult } from "@/lib/explanations/engine";
+import type { ExplanationContext } from "@/types/explanation";
 import type { IndexObjectType, SearchResultItem } from "@/types/index";
 
 const TYPE_LABELS: Record<IndexObjectType, string> = {
@@ -13,13 +16,20 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "recurring-transaction": "Recurring",
   "forecast-summary": "Forecast",
   conversation: "Past Question",
+  explanation: "Explanation",
 };
 
 function formatAmount(amount: number): string {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 }
 
-export default function SearchResultCard({ item }: { item: SearchResultItem }) {
+export default function SearchResultCard({
+  item,
+  explanationContext,
+}: {
+  item: SearchResultItem;
+  explanationContext?: ExplanationContext;
+}) {
   const { object } = item;
   return (
     <Card size="sm">
@@ -46,6 +56,11 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+        {explanationContext && object.type !== "explanation" && (
+          <div className="flex justify-end">
+            <WhyButton explain={() => explainSearchResult(object, explanationContext)} />
           </div>
         )}
       </CardContent>

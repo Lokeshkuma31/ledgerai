@@ -1,6 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import FinancialEventBadge from "@/components/FinancialEventBadge";
+import WhyButton from "@/components/WhyButton";
+import { explainFinancialEvent } from "@/lib/explanations/engine";
 import type { FinancialEvent, FinancialEventType } from "@/types/event";
+import type { ExplanationContext } from "@/types/explanation";
 
 const TYPE_ICONS: Record<FinancialEventType, string> = {
   "large-expense": "💸",
@@ -41,9 +44,11 @@ function formatEventDate(dateStr: string, now: Date): string {
 export default function FinancialEventCard({
   event,
   now = new Date(),
+  explanationContext,
 }: {
   event: FinancialEvent;
   now?: Date;
+  explanationContext?: ExplanationContext;
 }) {
   return (
     <Card size="sm">
@@ -59,6 +64,11 @@ export default function FinancialEventCard({
           {formatEventDate(event.date, now)}
         </span>
         <p className="text-sm">{event.description}</p>
+        {explanationContext && (
+          <div className="flex justify-end">
+            <WhyButton explain={() => explainFinancialEvent(event, explanationContext)} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

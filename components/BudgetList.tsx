@@ -3,13 +3,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import BudgetCard from "@/components/BudgetCard";
 import BudgetDialog from "@/components/BudgetDialog";
 import type { Budget, BudgetStatus } from "@/types/budget";
+import type { ExplanationContext } from "@/types/explanation";
 
 export default function BudgetList({
   statuses,
   onBudgetsChange,
+  explanationContext,
 }: {
   statuses: BudgetStatus[];
   onBudgetsChange: (budgets: Budget[]) => void;
+  explanationContext: ExplanationContext;
 }) {
   const existingCategories = statuses.map((s) => s.category);
 
@@ -49,6 +52,7 @@ export default function BudgetList({
             key={status.id}
             status={status}
             onBudgetsChange={onBudgetsChange}
+            explanationContext={explanationContext}
           />
         ))}
       </div>
