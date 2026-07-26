@@ -13,23 +13,19 @@ import InsightsSummary from "@/components/InsightsSummary";
 import RecommendationList from "@/components/RecommendationList";
 import TimelineSection from "@/components/TimelineSection";
 import { completeRecommendation, dismissRecommendation } from "@/lib/decision/storage";
-import { addTransaction, reviewTransaction } from "@/lib/storage";
+import { reviewTransaction } from "@/lib/storage";
 import type { FinancialState } from "@/types/financial-state";
 import type { Recommendation } from "@/types/recommendation";
-import type { Category, Transaction } from "@/types/transaction";
+import type { Category } from "@/types/transaction";
 
 /**
  * Renders sections purely from the orchestrator's FinancialState. This
- * component never calls an engine directly — mutations go through the
- * existing storage helpers, then trigger a rebuild via useDashboard().refresh.
+ * component never calls an engine directly — mutations go through Source
+ * Plugins or the existing storage helpers, then trigger a rebuild via
+ * useDashboard().refresh.
  */
 export default function DashboardSections({ state }: { state: FinancialState }) {
   const { refresh } = useDashboard();
-
-  function handleAdd(transaction: Transaction) {
-    addTransaction(transaction);
-    refresh();
-  }
 
   function handleReview(id: string, userCategory?: Category) {
     reviewTransaction(id, userCategory);
@@ -58,7 +54,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
     <div className="flex flex-col gap-4">
       {hasTransactions && <DashboardSummary stats={state.dashboardStats} />}
       <div className="flex justify-end">
-        <AddExpenseDialog onAdd={handleAdd} />
+        <AddExpenseDialog onAdd={refresh} />
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">Insights</h2>

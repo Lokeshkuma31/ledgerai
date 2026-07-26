@@ -95,3 +95,35 @@ export function reviewTransaction(
   saveTransactions(sorted);
   return sorted;
 }
+
+/** Repoints every transaction tagged with `fromMerchantId` to the merge
+ * target, after the Merchant Directory merges two merchant records. */
+export function reassignMerchant(
+  fromMerchantId: string,
+  toMerchantId: string,
+  toMerchantName: string,
+): Transaction[] {
+  const transactions = getTransactions();
+  const updated = transactions.map((t) =>
+    t.merchantId === fromMerchantId
+      ? { ...t, merchantId: toMerchantId, merchantName: toMerchantName }
+      : t,
+  );
+  const sorted = sortTransactions(updated);
+  saveTransactions(sorted);
+  return sorted;
+}
+
+/** Clears merchant fields from every transaction tagged with `merchantId`,
+ * after the Merchant Directory deletes that merchant record. */
+export function clearMerchantFromTransactions(merchantId: string): Transaction[] {
+  const transactions = getTransactions();
+  const updated = transactions.map((t) =>
+    t.merchantId === merchantId
+      ? { ...t, merchantId: undefined, merchantName: undefined, merchantConfidence: undefined }
+      : t,
+  );
+  const sorted = sortTransactions(updated);
+  saveTransactions(sorted);
+  return sorted;
+}

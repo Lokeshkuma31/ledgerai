@@ -34,10 +34,17 @@ export default function TransactionCard({
   return (
     <Card>
       <CardContent className="flex flex-col gap-1">
-        <span className="text-lg font-semibold">
-          ₹{transaction.amount.toLocaleString("en-IN")}
-        </span>
-        <p className="text-sm">{transaction.note}</p>
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-base font-semibold">
+            {transaction.merchantName ?? "Unrecognized Merchant"}
+          </span>
+          <span className="text-lg font-semibold">
+            ₹{transaction.amount.toLocaleString("en-IN")}
+          </span>
+        </div>
+        <p className="text-muted-foreground text-xs italic">
+          &ldquo;{transaction.note}&rdquo;
+        </p>
         <div className="text-muted-foreground flex items-center justify-between text-xs">
           <span>{transaction.paymentMethod}</span>
           <span>{formatDate(transaction.date)}</span>

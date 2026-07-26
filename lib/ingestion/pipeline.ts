@@ -1,5 +1,6 @@
 import { classifyTransaction } from "@/lib/ai/classifier";
 import { findRememberedCategory } from "@/lib/ai/memory";
+import { identifyMerchant } from "@/lib/merchant/engine";
 import type { PaymentMethod, Transaction } from "@/types/transaction";
 
 export interface IngestInput {
@@ -35,8 +36,12 @@ function validateInput(input: IngestInput): void {
   }
 }
 
+function collapseWhitespace(note: string): string {
+  return note.trim().replace(/\s+/g, " ");
+}
+
 function normalizeNote(note: string): string {
-  const collapsed = note.trim().replace(/\s+/g, " ");
+  const collapsed = collapseWhitespace(note);
   const lower = collapsed.toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
@@ -49,9 +54,19 @@ function generateMetadata(): { id: string; createdAt: string } {
  * Single entry point for every transaction source (manual entry today;
  * SMS/UPI notifications/bank APIs/etc. in future milestones all funnel
  * through this same function). Pure TypeScript — no React, no localStorage.
+ *
+ * Flow: Validation -> Normalization -> Merchant Extraction -> Merchant
+ * Registry -> AI Memory -> Classifier. Storage happens outside this
+ * function, in whichever source called it.
  */
 export function ingestTransaction(input: IngestInput): Transaction {
   validateInput(input);
+
+  // Merchant extraction relies on capitalization (e.g. "at Starbucks"), so
+  // it runs on the whitespace-collapsed but case-preserved note — not the
+  // lowercased-for-display `note` below, which the classifier/memory don't
+  // need original casing for anyway (both lowercase internally).
+  const merchant = identifyMerchant(collapseWhitespace(input.note));
 
   const note = normalizeNote(input.note);
   const { id, createdAt } = generateMetadata();
@@ -72,5 +87,8 @@ export function ingestTransaction(input: IngestInput): Transaction {
     confidence,
     classificationSource,
     reviewed: false,
+    merchantId: merchant?.merchantId,
+    merchantName: merchant?.merchantName,
+    merchantConfidence: merchant?.merchantConfidence,
   };
 }

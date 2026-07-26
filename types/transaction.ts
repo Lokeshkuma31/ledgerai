@@ -36,4 +36,9 @@ export interface Transaction {
   reviewed: boolean;
   date: string; // "YYYY-MM-DD", local calendar date
   createdAt: string; // full ISO 8601 timestamp, sort tiebreaker
+  // Merchant Intelligence Engine — undefined when no merchant was detected,
+  // and on any transaction ingested before this field existed.
+  merchantId?: string;
+  merchantName?: string;
+  merchantConfidence?: number;
 }
