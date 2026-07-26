@@ -15,6 +15,12 @@ export default function DashboardPage() {
             Merchants
           </Link>
           <Link
+            href="/settings/import"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Imports
+          </Link>
+          <Link
             href="/settings/sources"
             className="text-muted-foreground text-sm hover:underline"
           >

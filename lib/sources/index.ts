@@ -1,3 +1,4 @@
+import { csvSource } from "@/lib/sources/CSVSource";
 import { manualSource } from "@/lib/sources/ManualSource";
 import { sourceRegistry } from "@/lib/sources/SourceRegistry";
 import type { SourceHealth, SourceMetadata, TransactionSource } from "@/types/source";
@@ -45,6 +46,7 @@ function registerComingSoon(
 }
 
 sourceRegistry.register(manualSource);
+sourceRegistry.register(csvSource);
 registerComingSoon(
   "sms",
   "SMS Reader",
@@ -64,11 +66,6 @@ registerComingSoon(
   "email",
   "Email Import",
   "Import transactions from e-mailed receipts and statements.",
-);
-registerComingSoon(
-  "csv",
-  "CSV Import",
-  "Bulk import transactions from a CSV file.",
 );
 
 /** Restores enabled/disabled choices the user made in Settings. Only ever

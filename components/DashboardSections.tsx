@@ -9,6 +9,7 @@ import CompletedRecommendations from "@/components/CompletedRecommendations";
 import DashboardSummary from "@/components/DashboardSummary";
 import { useDashboard } from "@/components/DashboardProvider";
 import FinancialEvents from "@/components/FinancialEvents";
+import ImportDialog from "@/components/ImportDialog";
 import InsightsSummary from "@/components/InsightsSummary";
 import RecommendationList from "@/components/RecommendationList";
 import TimelineSection from "@/components/TimelineSection";
@@ -53,7 +54,8 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
   return (
     <div className="flex flex-col gap-4">
       {hasTransactions && <DashboardSummary stats={state.dashboardStats} />}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <ImportDialog onImported={refresh} />
         <AddExpenseDialog onAdd={refresh} />
       </div>
       <div className="flex flex-col gap-4">

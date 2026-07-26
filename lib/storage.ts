@@ -77,6 +77,16 @@ export function addTransaction(transaction: Transaction): Transaction[] {
   return updated;
 }
 
+/** Same as addTransaction, but persists a whole batch in a single
+ * read-modify-write — used by bulk sources (e.g. CSV import) instead of
+ * calling addTransaction once per row. */
+export function addTransactions(transactions: Transaction[]): Transaction[] {
+  if (transactions.length === 0) return getTransactions();
+  const updated = sortTransactions([...getTransactions(), ...transactions]);
+  saveTransactions(updated);
+  return updated;
+}
+
 export function reviewTransaction(
   id: string,
   userCategory?: Category,

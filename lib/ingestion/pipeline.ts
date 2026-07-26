@@ -10,7 +10,7 @@ export interface IngestInput {
   date: string;
 }
 
-function isValidDate(date: string): boolean {
+export function isValidDate(date: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) return false;
   const year = Number(match[1]);
