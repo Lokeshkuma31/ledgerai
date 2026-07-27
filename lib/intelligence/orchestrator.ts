@@ -9,6 +9,7 @@ import {
   type CoachOutput,
   type MerchantCoachSummary,
 } from "@/lib/coach/coach";
+import { collectCoachImportSummaries } from "@/lib/coach/contributors";
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
@@ -448,6 +449,11 @@ export async function buildFinancialState(
     durationMs: run.durationMs,
   }));
 
+  // Transaction-source plugins (e.g. the Android SMS & Notification Source
+  // Plugin) publish an import summary via registerCoachImportSummaryContributor
+  // — collected fresh each run, the same way Feed/Search contributions are.
+  const importSummaries = collectCoachImportSummaries();
+
   let coachSummary: CoachOutput | null = null;
   if (transactions.length > 0) {
     try {
@@ -463,6 +469,7 @@ export async function buildFinancialState(
         pendingCandidates.map((c) => `${c.id}:${c.policyDecision}`),
         workflowRuns.map((run) => `${run.runId}:${run.status}`),
         goalSummaries.map((g) => `${g.name}:${g.currentAmount}`),
+        importSummaries.map((s) => `${s.pluginName}:${s.importedCount}:${s.lastImportAt}`),
       );
       const cached = loadCoachCache();
       if (cached && cached.signature === signature) {
@@ -485,6 +492,7 @@ export async function buildFinancialState(
           policySummary,
           workflowSummaries,
           goalSummaries,
+          importSummaries,
         });
         saveCoachCache(signature, coachSummary);
       }

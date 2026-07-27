@@ -1,6 +1,7 @@
 "use server";
 
 import { generateText } from "@/lib/ai/provider";
+import type { CoachImportSummaryContribution } from "@/lib/coach/contributors";
 import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
@@ -83,6 +84,13 @@ export interface CoachInput {
    * on-track status for each goal. The LLM narrates these; it must never
    * calculate goal progress or savings pace itself. */
   goalSummaries: GoalCoachSummary[];
+  /** Already-computed by transaction-source plugins (e.g. the Android SMS
+   * & Notification Source Plugin) via registerCoachImportSummaryContributor
+   * — how many messages each contributed, how many became transactions,
+   * duplicates, and failures. The LLM only narrates these as background
+   * context; it never re-parses or re-imports anything itself. Empty when
+   * no such plugin is installed/enabled. */
+  importSummaries: CoachImportSummaryContribution[];
 }
 
 export interface CoachOutput {
@@ -222,6 +230,14 @@ function buildAnalyticsPayload(input: CoachInput) {
       status: g.status,
       monthlySavingsNeeded: g.monthlySavingsNeeded,
     })),
+    importSummaries: input.importSummaries.map((s) => ({
+      plugin: s.pluginName,
+      totalMessages: s.totalMessages,
+      importedCount: s.importedCount,
+      duplicateCount: s.duplicateCount,
+      failedCount: s.failedCount,
+      lastImportAt: s.lastImportAt,
+    })),
   };
 }
 
@@ -240,6 +256,7 @@ function buildPrompt(analytics: ReturnType<typeof buildAnalyticsPayload>): strin
     "The `notifications` field was already decided by a deterministic Automation & Notification Policy Engine — `notifications.pending` lists candidates it decided deserve prompt attention or a daily briefing slot, `notifications.suppressedCount` is how many it silenced or dismissed, and `notifications.dailyBriefing` lists what's queued for the next briefing. Do not decide, second-guess, or invent notification policy yourself — only mention what's pending or queued, in plain language, as context for the user.",
     "The `workflows` field lists recent workflow runs already executed by a deterministic Financial Workflow Engine, which coordinates the other engines through fixed step sequences — each entry has a `name`, `trigger`, `status` (completed/failed/partial), and `stepCount`. Do not trigger, invent, or second-guess a workflow yourself — only mention what ran and whether it succeeded, as background context if relevant to the question at hand.",
     "The `goals` field lists the user's savings goals, each already computed by a deterministic Goals Engine — `percentComplete`, `daysRemaining`, `status`, and `monthlySavingsNeeded` (the pace required to hit the target on time) are already-correct facts. Do not recalculate any of these, invent a payoff date, or estimate a different required pace yourself — only explain what they mean and, if relevant, whether the user's current spending pattern supports that pace.",
+    "The `importSummaries` field (if non-empty) lists transaction-source plugins (e.g. an Android SMS & notification importer) and how many messages each already processed, imported, skipped as duplicates, or failed to parse — already computed by that plugin, never by you. Only mention this as brief background context (e.g. 'most of your recent transactions came in automatically from your SMS import') when relevant to the question at hand; never re-parse a message or second-guess the counts.",
     "Your job is only to explain spending patterns and give personalized, actionable financial advice based on the structured analytics below.",
     "",
     "Analytics (JSON):",

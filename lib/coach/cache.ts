@@ -36,13 +36,14 @@ export function computeCoachSignature(
   policyCandidateIds: string[] = [],
   workflowRunIds: string[] = [],
   goalProgressKeys: string[] = [],
+  importSummaryKeys: string[] = [],
 ): string {
   const txParts = transactions.map(
     (t) =>
       `${t.id}:${t.reviewed ? 1 : 0}:${t.userCategory ?? t.aiCategory ?? ""}`,
   );
   const budgetParts = budgets.map((b) => `${b.id}:${b.monthlyLimit}`);
-  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}::feed${feedItemIds.join("|")}::policy${policyCandidateIds.join("|")}::workflow${workflowRunIds.join("|")}::goals${goalProgressKeys.join("|")}`;
+  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}::feed${feedItemIds.join("|")}::policy${policyCandidateIds.join("|")}::workflow${workflowRunIds.join("|")}::goals${goalProgressKeys.join("|")}::imports${importSummaryKeys.join("|")}`;
 }
 
 export function loadCoachCache(): CoachCache | null {

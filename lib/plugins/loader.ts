@@ -1,6 +1,7 @@
 import { emitHook } from "@/lib/plugins/hooks";
 import { installPlugin } from "@/lib/plugins/lifecycle";
 import { getAllSourcePlugins } from "@/lib/plugins/sourceAdapter";
+import { androidSmsPlugin } from "@/plugins/android-sms/plugin";
 import type { Plugin } from "@/types/plugin";
 
 let hasLoaded = false;
@@ -12,7 +13,7 @@ let hasLoaded = false;
  * here as a new entry in this array.
  */
 function builtInPlugins(): Plugin[] {
-  return [...getAllSourcePlugins()];
+  return [...getAllSourcePlugins(), androidSmsPlugin];
 }
 
 /**

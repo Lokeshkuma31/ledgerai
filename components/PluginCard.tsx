@@ -1,8 +1,16 @@
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import PluginCapabilities from "@/components/PluginCapabilities";
 import PluginHealthBadge from "@/components/PluginHealthBadge";
 import type { PluginRecord } from "@/types/plugin";
+
+/** Plugins with their own dedicated dashboard page (see AGENTS.md's plugin
+ * milestones) — most built-in plugins don't have one, so this stays empty
+ * for them and PluginCard renders no "Manage" link at all. */
+const PLUGIN_MANAGEMENT_URLS: Partial<Record<string, string>> = {
+  "android-sms": "/plugins/android-sms",
+};
 
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
@@ -59,6 +67,11 @@ export default function PluginCard({
           Installed {formatTimestamp(plugin.installedAt)} · Updated {formatTimestamp(plugin.updatedAt)}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-1">
+          {PLUGIN_MANAGEMENT_URLS[plugin.id] && (
+            <Button variant="outline" size="xs" render={<Link href={PLUGIN_MANAGEMENT_URLS[plugin.id]!} />}>
+              Manage
+            </Button>
+          )}
           {onReload && (
             <Button variant="outline" size="xs" onClick={() => onReload(plugin)} disabled={isBusy}>
               Reload
