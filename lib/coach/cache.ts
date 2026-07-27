@@ -15,6 +15,8 @@ interface CoachCache {
  * changes what the Coach sees in `merchantSummaries` without necessarily
  * touching any transaction), a recurring item's status changes (e.g.
  * Upcoming -> Missed purely because time passed, with no new transaction),
+ * the set of non-dismissed feed items changes (dismissing/restoring one
+ * changes what the Coach is handed without touching any transaction),
  * or the calendar day changes (the Forecast Engine's days-remaining and
  * confidence shift daily even with no new data) — the only conditions
  * under which the coach should regenerate.
@@ -27,13 +29,14 @@ export function computeCoachSignature(
   merchantIds: string[] = [],
   recurringStatuses: string[] = [],
   forecastDay: string = "",
+  feedItemIds: string[] = [],
 ): string {
   const txParts = transactions.map(
     (t) =>
       `${t.id}:${t.reviewed ? 1 : 0}:${t.userCategory ?? t.aiCategory ?? ""}`,
   );
   const budgetParts = budgets.map((b) => `${b.id}:${b.monthlyLimit}`);
-  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}`;
+  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}::feed${feedItemIds.join("|")}`;
 }
 
 export function loadCoachCache(): CoachCache | null {

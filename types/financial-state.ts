@@ -3,6 +3,7 @@ import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { FeedItem } from "@/types/feed";
 import type { CashFlowForecast, ForecastStatistics } from "@/types/forecast";
 import type { Recommendation } from "@/types/recommendation";
 import type { RecurringStatistics, RecurringTransaction } from "@/types/recurring";
@@ -36,6 +37,9 @@ export interface FinancialState {
   /** Cash Flow Forecast Engine output. */
   forecast: CashFlowForecast;
   forecastStatistics: ForecastStatistics;
+  /** Financial Intelligence Feed Engine output — the prioritized,
+   * deduplicated feed every dashboard widget reads from. */
+  feed: FeedItem[];
   coachSummary: CoachOutput | null;
   reviewStats: ReviewStats;
   memoryStats: MemoryStats;

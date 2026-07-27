@@ -12,21 +12,18 @@ import DailySpendCard from "@/components/DailySpendCard";
 import DashboardSummary from "@/components/DashboardSummary";
 import { useDashboard } from "@/components/DashboardProvider";
 import FinancialCopilot from "@/components/FinancialCopilot";
-import FinancialEvents from "@/components/FinancialEvents";
 import ForecastCard from "@/components/ForecastCard";
 import ForecastTable from "@/components/ForecastTable";
 import ImportDialog from "@/components/ImportDialog";
+import IntelligenceFeed from "@/components/IntelligenceFeed";
 import InsightsSummary from "@/components/InsightsSummary";
-import RecommendationList from "@/components/RecommendationList";
 import RecurringList from "@/components/RecurringList";
 import ScenarioSimulator from "@/components/ScenarioSimulator";
 import TimelineSection from "@/components/TimelineSection";
-import { completeRecommendation, dismissRecommendation } from "@/lib/decision/storage";
 import { getAllMerchantProfiles } from "@/lib/merchant/knowledge";
 import { getTransactions, reviewTransaction } from "@/lib/storage";
 import type { ExplanationContext } from "@/types/explanation";
 import type { FinancialState } from "@/types/financial-state";
-import type { Recommendation } from "@/types/recommendation";
 import type { Category } from "@/types/transaction";
 
 /**
@@ -63,20 +60,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
     refresh();
   }
 
-  function handleDismissRecommendation(recommendation: Recommendation) {
-    dismissRecommendation(recommendation.id, recommendation.createdAt);
-    refresh();
-  }
-
-  function handleCompleteRecommendation(recommendation: Recommendation) {
-    completeRecommendation(recommendation.id, recommendation.createdAt);
-    refresh();
-  }
-
   const hasTransactions = state.dashboardStats.totalTransactions > 0;
-  const activeRecommendations = state.recommendations.filter(
-    (r) => r.status === "new",
-  );
   const completedRecommendations = state.recommendations.filter(
     (r) => r.status === "completed",
   );
@@ -145,19 +129,13 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">
-          Financial Events
+          Intelligence Feed
         </h2>
-        <FinancialEvents events={state.events} explanationContext={explanationContext} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Recommendations
-        </h2>
-        <RecommendationList
-          recommendations={activeRecommendations}
-          onDismiss={handleDismissRecommendation}
-          onComplete={handleCompleteRecommendation}
+        <IntelligenceFeed
+          items={state.feed}
+          now={new Date(state.generatedAt)}
           explanationContext={explanationContext}
+          onChange={refresh}
         />
         <CompletedRecommendations recommendations={completedRecommendations} />
       </div>

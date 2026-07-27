@@ -18,6 +18,7 @@ import {
   explainForecast,
   explainRecommendation,
 } from "@/lib/explanations/engine";
+import { generateFeed } from "@/lib/feed/engine";
 import { generateForecast } from "@/lib/forecast/engine";
 import { computeForecastStatistics } from "@/lib/forecast/statistics";
 import { generateInsights, type Insights } from "@/lib/insights/engine";
@@ -30,6 +31,7 @@ import type { MemoryEntry } from "@/lib/ai/memory";
 import type { MerchantProfile } from "@/types/merchant-profile";
 import type { Budget, BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
+import type { FeedCoachSummary, FeedItem } from "@/types/feed";
 import type { CashFlowForecast, ForecastCoachSummary, ForecastStatistics } from "@/types/forecast";
 import type { FinancialState } from "@/types/financial-state";
 import type { ExplanationContext, ExplanationCoachSummary } from "@/types/explanation";
@@ -102,7 +104,7 @@ function emptyForecastStatistics(): ForecastStatistics {
  *
  * Runs the existing engines in dependency order — Timeline → Insights →
  * Budget → Merchant Knowledge → Recurring → Forecast → Events → Decision →
- * AI Coach — and assembles their output into a single FinancialState. Each engine
+ * Feed → AI Coach — and assembles their output into a single FinancialState. Each engine
  * still owns its own calculations; this function only sequences the calls
  * and shapes the result. If one engine fails, the others still run where
  * their inputs don't depend on the failed step, and the failure is
@@ -216,6 +218,26 @@ export async function buildFinancialState(
     warnings.push("Decision Engine unavailable.");
   }
 
+  let feed: FeedItem[] = [];
+  try {
+    feed = generateFeed({
+      transactions,
+      budgetStatuses,
+      events,
+      recommendations,
+      recurring,
+      newlyDetectedRecurring: recurringReconciliation.newlyDetected,
+      forecast,
+      forecastStatistics,
+      merchantProfiles,
+      insights,
+      timeline,
+      now,
+    });
+  } catch {
+    warnings.push("Financial Intelligence Feed Engine unavailable.");
+  }
+
   const reviewedCount = transactions.filter((t) => t.reviewed).length;
   const reviewStats = {
     totalTransactions: transactions.length,
@@ -268,6 +290,16 @@ export async function buildFinancialState(
         }
       : null;
 
+  const topFeedItems = feed.filter((item) => !item.isDismissed).slice(0, 10);
+  const feedSummaries: FeedCoachSummary[] = topFeedItems.map((item) => ({
+    type: item.type,
+    title: item.title,
+    summary: item.summary,
+    priority: item.priority,
+    severity: item.severity,
+    sourceEngine: item.sourceEngine,
+  }));
+
   // Financial Insight & Explanation Engine — generates the authoritative
   // "why" for the objects the Coach is about to summarize, so the Coach
   // narrates these instead of deriving its own reasoning from raw numbers.
@@ -306,6 +338,7 @@ export async function buildFinancialState(
         merchantSummaries.map((m) => m.canonicalName),
         recurring.map((r) => `${r.id}:${r.status}`),
         forecast.forecastGeneratedAt.slice(0, 10),
+        topFeedItems.map((item) => item.id),
       );
       const cached = loadCoachCache();
       if (cached && cached.signature === signature) {
@@ -324,6 +357,7 @@ export async function buildFinancialState(
           events,
           recommendations: activeRecommendations,
           explanations,
+          feedSummaries,
         });
         saveCoachCache(signature, coachSummary);
       }
@@ -354,6 +388,7 @@ export async function buildFinancialState(
     recurringStatistics,
     forecast,
     forecastStatistics,
+    feed,
     coachSummary,
     reviewStats,
     memoryStats,
