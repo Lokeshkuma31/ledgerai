@@ -68,7 +68,12 @@ export default function PluginCard({
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-1">
           {PLUGIN_MANAGEMENT_URLS[plugin.id] && (
-            <Button variant="outline" size="xs" render={<Link href={PLUGIN_MANAGEMENT_URLS[plugin.id]!} />}>
+            <Button
+              variant="outline"
+              size="xs"
+              nativeButton={false}
+              render={<Link href={PLUGIN_MANAGEMENT_URLS[plugin.id]!} />}
+            >
               Manage
             </Button>
           )}

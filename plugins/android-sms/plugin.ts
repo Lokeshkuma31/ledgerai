@@ -324,21 +324,34 @@ function toIngestInput(t: NormalizedSmsTransaction): IngestInput {
 }
 
 /**
- * Imports every "Ready" row: Normalizer output -> Ingestion Pipeline
- * (Merchant Extraction -> AI Memory -> Classifier) -> Storage — the same
- * two calls (ingestTransaction, then addTransactions) every other source
- * uses, so this plugin never fabricates a Transaction of its own. After a
- * successful batch: records duplicate signatures so the same message can
- * never be re-imported, fires the "onTransactionImported" hook, triggers
- * the "transaction-imported" workflow per transaction, and updates the
- * summary the Feed/Search/Coach contributions below read from.
+ * Imports every "Ready" row the caller selected: Normalizer output ->
+ * Ingestion Pipeline (Merchant Extraction -> AI Memory -> Classifier) ->
+ * Storage — the same two calls (ingestTransaction, then addTransactions)
+ * every other source uses, so this plugin never fabricates a Transaction
+ * of its own. After a successful batch: records duplicate signatures so
+ * the same message can never be re-imported, fires the
+ * "onTransactionImported" hook, triggers the "transaction-imported"
+ * workflow per transaction, and updates the summary the Feed/Search/Coach
+ * contributions below read from.
+ *
+ * `rows` must be the *entire* scanned batch, not just the ones being
+ * imported — duplicateCount/skippedCount/failedCount below are reported
+ * against the full batch so the dashboard reflects what scanning actually
+ * found, even though only a subset gets imported. `selectedMessageIds`
+ * narrows which "Ready" rows are actually imported; omitting it imports
+ * every Ready row (used by tests and any future non-interactive caller).
  */
-export async function importSelected(rows: SmsImportPreviewRow[]): Promise<ImportSummary> {
+export async function importSelected(
+  rows: SmsImportPreviewRow[],
+  selectedMessageIds?: Set<string>,
+): Promise<ImportSummary> {
   if (!androidSmsPlugin.enabled) {
     throw new Error("Android SMS & Notification Source is disabled. Enable it in Plugins to import messages.");
   }
 
-  const readyRows = rows.filter((r) => r.status === "Ready" && r.normalized);
+  const readyRows = rows.filter(
+    (r) => r.status === "Ready" && r.normalized && (!selectedMessageIds || selectedMessageIds.has(r.message.id)),
+  );
   const transactions = readyRows.map((r) => ingestTransaction(toIngestInput(r.normalized!)));
 
   if (transactions.length > 0) {

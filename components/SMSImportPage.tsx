@@ -7,9 +7,10 @@ import SMSHealthCard from "@/components/SMSHealthCard";
 import SMSParserStatistics from "@/components/SMSParserStatistics";
 import SMSPluginSettings from "@/components/SMSPluginSettings";
 import SMSPreviewTable from "@/components/SMSPreviewTable";
-import { getAllPluginRecords, loadPlugins } from "@/lib/plugins/engine";
+import { checkPluginHealth, getAllPluginRecords, loadPlugins } from "@/lib/plugins/engine";
 import { MOCK_SMS_MESSAGES } from "@/plugins/android-sms/mock-data";
 import {
+  DEFAULT_SETTINGS,
   getImportSummary,
   getSettings,
   getStatistics,
@@ -26,27 +27,55 @@ import type {
 import type { PluginHealth } from "@/types/plugin";
 
 const EMPTY_HEALTH: PluginHealth = { status: "unavailable", message: "Loading…", checkedAt: new Date().toISOString() };
+const EMPTY_STATISTICS: ParserStatistics = {
+  messagesParsed: 0,
+  successfulParses: 0,
+  failedParses: 0,
+  averageConfidence: 0,
+  duplicatesSkipped: 0,
+  unknownMerchants: 0,
+  unknownFormats: 0,
+};
+const EMPTY_SUMMARY: ImportSummary = {
+  totalMessages: 0,
+  importedCount: 0,
+  duplicateCount: 0,
+  skippedCount: 0,
+  failedCount: 0,
+  lastImportAt: null,
+};
 
 export default function SMSImportPage() {
   const [rows, setRows] = useState<SmsImportPreviewRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [settings, setSettings] = useState<AndroidSmsPluginSettings>(getSettings());
-  const [stats, setStats] = useState<ParserStatistics>(getStatistics());
-  const [summary, setSummary] = useState<ImportSummary>(getImportSummary());
+  // These read localStorage, which doesn't exist during server rendering —
+  // starting from a fixed default (matching what the server rendered) and
+  // loading the real persisted values inside the mount effect below avoids
+  // a hydration mismatch between the server and client's first render.
+  const [settings, setSettings] = useState<AndroidSmsPluginSettings>(DEFAULT_SETTINGS);
+  const [stats, setStats] = useState<ParserStatistics>(EMPTY_STATISTICS);
+  const [summary, setSummary] = useState<ImportSummary>(EMPTY_SUMMARY);
   const [enabled, setEnabled] = useState(true);
   const [health, setHealth] = useState<PluginHealth>(EMPTY_HEALTH);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function refreshPluginRecord() {
+  // The Plugin Framework's health() is pull-based — it only reflects the
+  // plugin's *current* statistics when something explicitly (re-)checks
+  // it, otherwise the badge would keep showing whatever health was
+  // computed at install time (e.g. "no messages scanned yet") even after a
+  // real scan/import made it stale. Called after mount, and after every
+  // scan/import, so the badge always matches what's actually on screen.
+  async function refreshPluginRecord() {
     const record = getAllPluginRecords().find((r) => r.id === "android-sms");
-    if (record) {
-      setEnabled(record.enabled);
-      setHealth(record.health);
-    }
+    if (record) setEnabled(record.enabled);
+    setHealth(await checkPluginHealth("android-sms"));
   }
 
   useEffect(() => {
+    setSettings(getSettings());
+    setStats(getStatistics());
+    setSummary(getImportSummary());
     loadPlugins().finally(refreshPluginRecord);
   }, []);
 
@@ -62,7 +91,7 @@ export default function SMSImportPage() {
       ),
     );
     setStats(getStatistics());
-    refreshPluginRecord();
+    void refreshPluginRecord();
   }
 
   function handleToggleRow(id: string) {
@@ -86,14 +115,17 @@ export default function SMSImportPage() {
     setBusy(true);
     setError(null);
     try {
-      const toImport = rows.filter((r) => r.status === "Ready" && selected.has(r.message.id));
-      const importedIds = new Set(toImport.map((r) => r.message.id));
-      const result = await importSelected(toImport);
+      // The full scanned batch is passed (not just the selected subset) so
+      // the returned summary's duplicateCount/skippedCount/failedCount
+      // reflect what scanning actually found; `selected` only narrows which
+      // Ready rows get imported.
+      const importedIds = new Set(selected);
+      const result = await importSelected(rows, selected);
       setRows((prev) => prev.map((r) => (importedIds.has(r.message.id) ? { ...r, status: "Imported" } : r)));
       setSelected(new Set());
       setSummary(result);
       setStats(getStatistics());
-      refreshPluginRecord();
+      await refreshPluginRecord();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed.");
     } finally {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { androidSmsPlugin, buildPreviewRows, DEFAULT_SETTINGS } from "@/plugins/android-sms/plugin";
+import { androidSmsPlugin, buildPreviewRows, DEFAULT_SETTINGS, importSelected } from "@/plugins/android-sms/plugin";
 import type { RawSmsMessage } from "@/plugins/android-sms/types";
 
 function message(id: string, body: string, receivedAt = "2026-07-20T10:00:00Z"): RawSmsMessage {
@@ -46,6 +46,27 @@ describe("buildPreviewRows", () => {
       { ...DEFAULT_SETTINGS, unknownMerchantHandling: "skip" },
     );
     expect(rows[0].status).toBe("Skipped");
+  });
+});
+
+describe("importSelected", () => {
+  it("only imports the rows named in selectedMessageIds, but reports duplicate/failed counts against the whole batch", async () => {
+    const dupBody = "₹250.00 paid to Zomato using UPI. UPI Ref No 998877001122.";
+    const rows = buildPreviewRows([
+      message("m1", "₹450.00 paid to Swiggy using UPI."),
+      message("m2", dupBody, "2026-07-20T10:00:00Z"),
+      message("m3", dupBody, "2026-07-20T10:01:00Z"), // Duplicate of m2
+      message("m4", "123456 is your OTP for login."), // Malformed
+    ]);
+    expect(rows.map((r) => r.status)).toEqual(["Ready", "Ready", "Duplicate", "Malformed"]);
+
+    // Only m1 is selected for import — m2 is Ready but deliberately left unchecked.
+    const summary = await importSelected(rows, new Set(["m1"]));
+
+    expect(summary.totalMessages).toBe(4);
+    expect(summary.importedCount).toBe(1);
+    expect(summary.duplicateCount).toBe(1);
+    expect(summary.failedCount).toBe(1);
   });
 });
 

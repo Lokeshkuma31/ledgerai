@@ -87,7 +87,9 @@ export default function SMSPluginSettings({
           onValueChange={(value) => onChange({ unknownMerchantHandling: value as UnknownMerchantHandling })}
         >
           <SelectTrigger id="sms-unknown-merchant" className="w-full">
-            <SelectValue />
+            <SelectValue>
+              {(value: UnknownMerchantHandling) => UNKNOWN_MERCHANT_LABELS[value]}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {(Object.keys(UNKNOWN_MERCHANT_LABELS) as UnknownMerchantHandling[]).map((value) => (

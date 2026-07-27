@@ -9,10 +9,14 @@ import type { NormalizedSmsTransaction, ParsedSmsTransaction } from "@/plugins/a
 
 const CORPORATE_SUFFIXES = /\b(pvt\.?\s*ltd\.?|private\s+limited|ltd\.?|limited|llc|inc\.?)\b/gi;
 
-/** Keeps all-caps tokens as-is (BESCOM, IRCTC, PVR read fine already);
- * everything else becomes Title Case rather than shouting or all-lower. */
+/** Leaves a word alone whenever it already carries meaningful casing — an
+ * all-caps acronym (BESCOM, IRCTC) or a mixed-case brand name with an
+ * internal capital (MakeMyTrip, BookMyShow) — since forcing either through
+ * charAt(0)+toLowerCase() would flatten "MakeMyTrip" into "Makemytrip".
+ * Only a word with no signal beyond its first letter (all lowercase, or a
+ * single leading capital) gets normalized to Title Case. */
 function titleCaseWord(word: string): string {
-  if (word.length > 1 && word === word.toUpperCase() && /[A-Z]/.test(word)) {
+  if (word.length > 1 && /[A-Z]/.test(word.slice(1))) {
     return word;
   }
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();

@@ -17,6 +17,11 @@ describe("normalizeMerchantName", () => {
     expect(normalizeMerchantName("  Uber   India   Pvt Ltd  ")).toBe("Uber India");
   });
 
+  it("keeps a mixed-case brand name with an internal capital as-is", () => {
+    expect(normalizeMerchantName("MakeMyTrip")).toBe("MakeMyTrip");
+    expect(normalizeMerchantName("BookMyShow")).toBe("BookMyShow");
+  });
+
   it("keeps an all-caps acronym as-is", () => {
     expect(normalizeMerchantName("BESCOM")).toBe("BESCOM");
   });
