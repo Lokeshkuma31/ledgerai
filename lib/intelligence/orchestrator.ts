@@ -9,7 +9,7 @@ import {
   type CoachOutput,
   type MerchantCoachSummary,
 } from "@/lib/coach/coach";
-import { collectCoachImportSummaries } from "@/lib/coach/contributors";
+import { collectCoachAccountSummaries, collectCoachImportSummaries } from "@/lib/coach/contributors";
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
@@ -454,6 +454,11 @@ export async function buildFinancialState(
   // — collected fresh each run, the same way Feed/Search contributions are.
   const importSummaries = collectCoachImportSummaries();
 
+  // The Bank Connector Framework publishes a structured account summary
+  // (connected count, combined balance, stale accounts) the same way —
+  // via registerCoachAccountSummaryContributor.
+  const accountSummaries = collectCoachAccountSummaries();
+
   let coachSummary: CoachOutput | null = null;
   if (transactions.length > 0) {
     try {
@@ -470,6 +475,7 @@ export async function buildFinancialState(
         workflowRuns.map((run) => `${run.runId}:${run.status}`),
         goalSummaries.map((g) => `${g.name}:${g.currentAmount}`),
         importSummaries.map((s) => `${s.pluginName}:${s.importedCount}:${s.lastImportAt}`),
+        accountSummaries.map((a) => `${a.connectedAccountCount}:${a.combinedBalance}:${a.staleAccounts.length}`),
       );
       const cached = loadCoachCache();
       if (cached && cached.signature === signature) {
@@ -493,6 +499,7 @@ export async function buildFinancialState(
           workflowSummaries,
           goalSummaries,
           importSummaries,
+          accountSummaries,
         });
         saveCoachCache(signature, coachSummary);
       }

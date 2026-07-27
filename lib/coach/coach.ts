@@ -1,7 +1,7 @@
 "use server";
 
 import { generateText } from "@/lib/ai/provider";
-import type { CoachImportSummaryContribution } from "@/lib/coach/contributors";
+import type { BankCoachAccountSummary, CoachImportSummaryContribution } from "@/lib/coach/contributors";
 import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
@@ -91,6 +91,13 @@ export interface CoachInput {
    * context; it never re-parses or re-imports anything itself. Empty when
    * no such plugin is installed/enabled. */
   importSummaries: CoachImportSummaryContribution[];
+  /** Already-computed by the Bank Connector Framework via
+   * registerCoachAccountSummaryContributor — connected account count,
+   * combined balance, and which accounts haven't synced recently. The
+   * LLM only narrates this; it must never talk to a connector, compute a
+   * balance, or decide what counts as "stale" itself. Empty when no bank
+   * accounts are connected. */
+  accountSummaries: BankCoachAccountSummary[];
 }
 
 export interface CoachOutput {
@@ -238,6 +245,16 @@ function buildAnalyticsPayload(input: CoachInput) {
       failedCount: s.failedCount,
       lastImportAt: s.lastImportAt,
     })),
+    accounts: input.accountSummaries.map((a) => ({
+      connectedAccountCount: a.connectedAccountCount,
+      combinedBalance: Math.round(a.combinedBalance),
+      currency: a.currency,
+      staleAccounts: a.staleAccounts.map((s) => ({
+        accountName: s.accountName,
+        institution: s.institution,
+        daysSinceSync: s.daysSinceSync,
+      })),
+    })),
   };
 }
 
@@ -257,6 +274,7 @@ function buildPrompt(analytics: ReturnType<typeof buildAnalyticsPayload>): strin
     "The `workflows` field lists recent workflow runs already executed by a deterministic Financial Workflow Engine, which coordinates the other engines through fixed step sequences — each entry has a `name`, `trigger`, `status` (completed/failed/partial), and `stepCount`. Do not trigger, invent, or second-guess a workflow yourself — only mention what ran and whether it succeeded, as background context if relevant to the question at hand.",
     "The `goals` field lists the user's savings goals, each already computed by a deterministic Goals Engine — `percentComplete`, `daysRemaining`, `status`, and `monthlySavingsNeeded` (the pace required to hit the target on time) are already-correct facts. Do not recalculate any of these, invent a payoff date, or estimate a different required pace yourself — only explain what they mean and, if relevant, whether the user's current spending pattern supports that pace.",
     "The `importSummaries` field (if non-empty) lists transaction-source plugins (e.g. an Android SMS & notification importer) and how many messages each already processed, imported, skipped as duplicates, or failed to parse — already computed by that plugin, never by you. Only mention this as brief background context (e.g. 'most of your recent transactions came in automatically from your SMS import') when relevant to the question at hand; never re-parse a message or second-guess the counts.",
+    "The `accounts` field (if non-empty) lists connected bank/card/wallet account summaries already computed by the Bank Connector Framework — `connectedAccountCount`, `combinedBalance`, and any `staleAccounts` (accounts that haven't synced recently, with `daysSinceSync`). Treat these as already-correct facts: do not recalculate a balance, invent an account, or decide staleness yourself. Only mention this as background context when relevant (e.g. noting a stale account the user should reconnect), the way the milestone's own example does: 'You currently have 3 connected accounts with a combined balance of $12,450. One account has not synchronized in 3 days.'",
     "Your job is only to explain spending patterns and give personalized, actionable financial advice based on the structured analytics below.",
     "",
     "Analytics (JSON):",

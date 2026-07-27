@@ -50,6 +50,9 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   conversation: "Past Questions",
   explanation: "Explanations",
   workflow: "Workflow Runs",
+  "bank-account": "Bank Accounts",
+  "bank-institution": "Bank Institutions",
+  "bank-sync-run": "Bank Syncs",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

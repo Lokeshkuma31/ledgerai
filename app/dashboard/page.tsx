@@ -45,6 +45,12 @@ export default function DashboardPage() {
             Plugins
           </Link>
           <Link
+            href="/banks"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Banks
+          </Link>
+          <Link
             href="/settings/import"
             className="text-muted-foreground text-sm hover:underline"
           >

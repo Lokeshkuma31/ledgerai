@@ -16,6 +16,9 @@ export const INDEX_OBJECT_TYPES = [
   "conversation",
   "explanation",
   "workflow",
+  "bank-account",
+  "bank-institution",
+  "bank-sync-run",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 

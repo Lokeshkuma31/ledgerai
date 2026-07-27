@@ -1,5 +1,14 @@
 "use client";
 
+// Side-effect import: registers the Bank Connector Framework's demo
+// connectors, the same reason loadPlugins() is awaited below — without
+// it, a Feed/Search/Coach contribution from a connector the user
+// connected on /banks would only show up here if /banks happened to load
+// first in the same session, since this whole orchestrator run (like
+// everything reading localStorage) is client-side, not shared with a
+// server-rendered page.
+import "@/lib/banks/providers";
+
 import {
   createContext,
   useCallback,

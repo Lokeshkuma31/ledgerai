@@ -48,3 +48,41 @@ export function collectCoachImportSummaries(): CoachImportSummaryContribution[] 
   }
   return summaries;
 }
+
+/**
+ * Same extension point, shaped for the Bank Connector Framework instead:
+ * already-computed structured account facts (connected account count,
+ * combined balance, which accounts haven't synced recently). The Coach
+ * only narrates this — it must never talk to a connector, compute a
+ * balance, or decide what "stale" means itself.
+ */
+export interface BankCoachAccountSummary {
+  connectedAccountCount: number;
+  combinedBalance: number;
+  currency: string;
+  staleAccounts: { accountName: string; institution: string; daysSinceSync: number }[];
+}
+
+const accountSummaryContributors = new Set<() => BankCoachAccountSummary | null>();
+
+export function registerCoachAccountSummaryContributor(
+  contributor: () => BankCoachAccountSummary | null,
+): () => void {
+  accountSummaryContributors.add(contributor);
+  return () => {
+    accountSummaryContributors.delete(contributor);
+  };
+}
+
+export function collectCoachAccountSummaries(): BankCoachAccountSummary[] {
+  const summaries: BankCoachAccountSummary[] = [];
+  for (const contributor of accountSummaryContributors) {
+    try {
+      const result = contributor();
+      if (result) summaries.push(result);
+    } catch (error) {
+      console.error("A bank-account-summary plugin threw while contributing to the Coach:", error);
+    }
+  }
+  return summaries;
+}

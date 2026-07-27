@@ -18,6 +18,9 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   conversation: "Past Question",
   explanation: "Explanation",
   workflow: "Workflow Run",
+  "bank-account": "Bank Account",
+  "bank-institution": "Bank Institution",
+  "bank-sync-run": "Bank Sync",
 };
 
 function formatAmount(amount: number): string {
