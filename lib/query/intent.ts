@@ -14,6 +14,7 @@ import type {
  * "budget" is caught before a generic "spending" match.
  */
 const INTENT_KEYWORDS: [QueryIntent, string[]][] = [
+  ["workflow-status", ["workflow", "workflows", "automation", "last run", "last refresh"]],
   ["budget-status", ["budget", "over budget", "on track", "exceed"]],
   [
     "cash-flow-forecast",

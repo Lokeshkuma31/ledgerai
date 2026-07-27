@@ -32,6 +32,36 @@ import type { Recommendation } from "@/types/recommendation";
 import type { RecurringTransaction } from "@/types/recurring";
 import type { Transaction } from "@/types/transaction";
 
+const feedContributors = new Set<() => FeedItem[]>();
+
+/**
+ * Published extension point for plugins with the "feed-generator"
+ * capability — the way they publish feed items without this engine (or
+ * the orchestrator that calls it) knowing anything about them. Called
+ * from a plugin's own register()/unregister(). Returns an unregister
+ * function.
+ */
+export function registerFeedContributor(contributor: () => FeedItem[]): () => void {
+  feedContributors.add(contributor);
+  return () => {
+    feedContributors.delete(contributor);
+  };
+}
+
+/** A misbehaving plugin must never break feed generation for everyone
+ * else — each contributor runs in its own try/catch. */
+function collectContributedFeedItems(): FeedItem[] {
+  const items: FeedItem[] = [];
+  for (const contributor of feedContributors) {
+    try {
+      items.push(...contributor());
+    } catch (error) {
+      console.error("A feed contributor plugin threw while generating items:", error);
+    }
+  }
+  return items;
+}
+
 export interface GenerateFeedInput {
   transactions: Transaction[];
   budgetStatuses: BudgetStatus[];
@@ -60,6 +90,11 @@ export interface GenerateFeedInput {
  *
  * The feed itself is entirely deterministic: no LLM call happens here. The
  * AI Financial Coach only explains/summarizes the result.
+ *
+ * Plugins can contribute additional feed items via registerFeedContributor
+ * above — the published extension point the Plugin Framework's Feed
+ * Engine integration is built on, without this engine importing anything
+ * from lib/plugins.
  */
 export function generateFeed(input: GenerateFeedInput): FeedItem[] {
   const now = input.now ?? new Date();
@@ -93,6 +128,7 @@ export function generateFeed(input: GenerateFeedInput): FeedItem[] {
     ...generateWeeklySummaryItems(input.timeline, now),
     ...generateMonthlySummaryItems(input.timeline, input.insights, now),
     ...generateSystemInsightItems(input.transactions, now),
+    ...collectContributedFeedItems(),
   ];
 
   const deduped = deduplicateFeedItems(raw);

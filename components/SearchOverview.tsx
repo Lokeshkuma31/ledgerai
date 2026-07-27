@@ -32,6 +32,7 @@ import {
 import { detectRecurringTransactions } from "@/lib/recurring/engine";
 import { getTransactions } from "@/lib/storage";
 import { generateTimeline } from "@/lib/timeline/engine";
+import { getAllRuns } from "@/lib/workflows/engine";
 import { INDEX_OBJECT_TYPES } from "@/types/index";
 import type { FinancialIndex, RecentSearch, SearchResult } from "@/types/index";
 import type { ExplanationContext } from "@/types/explanation";
@@ -98,6 +99,7 @@ function buildIndexFromStorage(): { index: FinancialIndex; explanationContext: E
     forecast,
     conversationHistory,
     explanations,
+    workflowRuns: getAllRuns(),
     now,
   });
 

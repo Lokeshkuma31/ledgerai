@@ -8,6 +8,7 @@ export const QUERY_INTENTS = [
   "financial-events",
   "recommendations",
   "general-summary",
+  "workflow-status",
   "unknown",
 ] as const;
 export type QueryIntent = (typeof QUERY_INTENTS)[number];

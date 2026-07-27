@@ -1,4 +1,5 @@
 import { searchFinancialIndex } from "@/lib/index";
+import { computeWorkflowStatistics, getAllRuns, getAllWorkflows } from "@/lib/workflows/engine";
 import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
 import type { FinancialIndex, IndexedObject } from "@/types/index";
@@ -375,4 +376,40 @@ export function executeGeneralSummary(_plan: ExecutionPlan, data: QueryDataSourc
 
 export function executeUnknown(plan: ExecutionPlan, data: QueryDataSources) {
   return { question: plan.question, understood: false, hasAnyData: data.transactions.length > 0 };
+}
+
+const RECENT_RUNS_LIMIT = 5;
+
+/** Workflow data lives in its own localStorage-backed registry/history
+ * (lib/workflows/*), not in QueryDataSources — this reads it directly,
+ * the same way lib/workflows/engine.ts is the single entry point every
+ * other subsystem uses to ask "what has the Workflow Engine done". */
+export function executeWorkflowStatus() {
+  const workflows = getAllWorkflows();
+  const runs = getAllRuns();
+  const statistics = computeWorkflowStatistics();
+
+  return {
+    totalWorkflows: statistics.totalWorkflows,
+    activeWorkflows: statistics.activeWorkflows,
+    successRate: statistics.successRate,
+    averageRuntimeMs: statistics.averageRuntimeMs,
+    mostTriggeredWorkflow: statistics.mostTriggeredWorkflow,
+    failedRuns: statistics.failedRuns,
+    workflows: workflows.map((w) => ({
+      name: w.name,
+      trigger: w.trigger,
+      status: w.status,
+      lastRunStatus: w.lastRun?.status ?? null,
+    })),
+    recentRuns: runs.slice(0, RECENT_RUNS_LIMIT).map((r) => ({
+      workflow: r.workflowName,
+      trigger: r.trigger,
+      status: r.status,
+      durationMs: r.durationMs,
+      successfulSteps: r.successfulSteps,
+      failedSteps: r.failedSteps,
+      startedAt: r.startedAt,
+    })),
+  };
 }

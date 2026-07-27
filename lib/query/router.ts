@@ -9,6 +9,7 @@ import {
   executeRecurringPayments,
   executeTransactionSearch,
   executeUnknown,
+  executeWorkflowStatus,
 } from "@/lib/query/executor";
 import type { FinancialIndex } from "@/types/index";
 import type { ExecutionPlan, QueryDataSources, QueryIntent } from "@/types/query";
@@ -29,6 +30,7 @@ const EXECUTORS: Record<QueryIntent, Executor> = {
   "financial-events": executeFinancialEvents,
   recommendations: executeRecommendations,
   "general-summary": executeGeneralSummary,
+  "workflow-status": executeWorkflowStatus,
   unknown: executeUnknown,
 };
 

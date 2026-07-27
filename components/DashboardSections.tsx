@@ -14,6 +14,7 @@ import { useDashboard } from "@/components/DashboardProvider";
 import FinancialCopilot from "@/components/FinancialCopilot";
 import ForecastCard from "@/components/ForecastCard";
 import ForecastTable from "@/components/ForecastTable";
+import GoalsSection from "@/components/GoalsSection";
 import ImportDialog from "@/components/ImportDialog";
 import IntelligenceFeed from "@/components/IntelligenceFeed";
 import InsightsSummary from "@/components/InsightsSummary";
@@ -97,6 +98,18 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
           explanationContext={explanationContext}
         />
       </div>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Savings Goals</h2>
+          <Link
+            href="/goals"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        <GoalsSection projectedMonthlySavings={hasTransactions ? state.forecast.expectedSavings : null} />
+      </div>
       {hasTransactions && (
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold tracking-tight">
@@ -135,6 +148,7 @@ export default function DashboardSections({ state }: { state: FinancialState }) 
           items={state.feed}
           now={new Date(state.generatedAt)}
           explanationContext={explanationContext}
+          notificationCandidates={state.notificationCandidates}
           onChange={refresh}
         />
         <CompletedRecommendations recommendations={completedRecommendations} />

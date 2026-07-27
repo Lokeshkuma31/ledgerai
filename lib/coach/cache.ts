@@ -16,10 +16,13 @@ interface CoachCache {
  * touching any transaction), a recurring item's status changes (e.g.
  * Upcoming -> Missed purely because time passed, with no new transaction),
  * the set of non-dismissed feed items changes (dismissing/restoring one
- * changes what the Coach is handed without touching any transaction),
- * or the calendar day changes (the Forecast Engine's days-remaining and
- * confidence shift daily even with no new data) — the only conditions
- * under which the coach should regenerate.
+ * changes what the Coach is handed without touching any transaction), the
+ * set of pending notification candidates changes (a new one firing, or an
+ * existing one's decision being overridden), a workflow run's outcome
+ * changes (a new run, or one flipping between completed/failed/partial), a
+ * savings goal's currentAmount changes, or the calendar day changes (the
+ * Forecast Engine's days-remaining and confidence shift daily even with no
+ * new data) — the only conditions under which the coach should regenerate.
  */
 export function computeCoachSignature(
   transactions: Transaction[],
@@ -30,13 +33,16 @@ export function computeCoachSignature(
   recurringStatuses: string[] = [],
   forecastDay: string = "",
   feedItemIds: string[] = [],
+  policyCandidateIds: string[] = [],
+  workflowRunIds: string[] = [],
+  goalProgressKeys: string[] = [],
 ): string {
   const txParts = transactions.map(
     (t) =>
       `${t.id}:${t.reviewed ? 1 : 0}:${t.userCategory ?? t.aiCategory ?? ""}`,
   );
   const budgetParts = budgets.map((b) => `${b.id}:${b.monthlyLimit}`);
-  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}::feed${feedItemIds.join("|")}`;
+  return `${txParts.join("|")}::mem${memoryEntryCount}::budgets${budgetParts.join("|")}::recs${recommendationIds.join("|")}::merchants${merchantIds.join("|")}::recurring${recurringStatuses.join("|")}::forecast${forecastDay}::feed${feedItemIds.join("|")}::policy${policyCandidateIds.join("|")}::workflow${workflowRunIds.join("|")}::goals${goalProgressKeys.join("|")}`;
 }
 
 export function loadCoachCache(): CoachCache | null {

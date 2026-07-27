@@ -11,6 +11,7 @@ import type { QueryResult } from "@/types/query";
 import type { Recommendation } from "@/types/recommendation";
 import type { RecurringTransaction } from "@/types/recurring";
 import type { Transaction } from "@/types/transaction";
+import type { WorkflowRun } from "@/types/workflow";
 
 function effectiveCategory(t: Transaction): string {
   return t.userCategory ?? t.aiCategory ?? "Other";
@@ -312,6 +313,29 @@ export function indexExplanations(explanations: Explanation[]): IndexedObject[] 
   );
 }
 
+export function indexWorkflowRuns(runs: WorkflowRun[]): IndexedObject[] {
+  return runs.map((run) =>
+    makeObject("workflow", {
+      id: run.runId,
+      title: run.workflowName,
+      description: `${run.trigger} · ${run.status} · ${run.successfulSteps}/${run.steps.length} step(s) succeeded`,
+      keywords: [run.workflowName, run.trigger, run.status],
+      tags: [run.status, run.trigger],
+      metadata: {
+        workflowId: run.workflowId,
+        trigger: run.trigger,
+        status: run.status,
+        durationMs: run.durationMs,
+        successfulSteps: run.successfulSteps,
+        failedSteps: run.failedSteps,
+        retryCount: run.retryCount,
+      },
+      createdAt: run.startedAt,
+      updatedAt: run.completedAt ?? run.startedAt,
+    }),
+  );
+}
+
 /**
  * Constructs a fresh FinancialIndex from every source the app already
  * computes — nothing here re-derives numbers the underlying engines own;
@@ -331,6 +355,7 @@ export function buildFinancialIndex(sources: FinancialIndexSources): FinancialIn
     ...indexForecastSummary(sources.forecast),
     ...indexConversationHistory(sources.conversationHistory),
     ...indexExplanations(sources.explanations),
+    ...indexWorkflowRuns(sources.workflowRuns ?? []),
   ];
 
   const counts = {} as Record<IndexObjectType, number>;

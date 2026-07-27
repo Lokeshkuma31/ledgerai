@@ -11,6 +11,7 @@ import {
 import { getMemoryEntries } from "@/lib/ai/memory";
 import { getBudgets } from "@/lib/budget/storage";
 import { buildFinancialState } from "@/lib/intelligence/orchestrator";
+import { loadPlugins } from "@/lib/plugins/engine";
 import { getTransactions } from "@/lib/storage";
 import type { FinancialState } from "@/types/financial-state";
 
@@ -57,7 +58,10 @@ export default function DashboardProvider({
   }, []);
 
   useEffect(() => {
-    refresh();
+    // Plugins (e.g. feed/search contributors) must be registered before the
+    // first FinancialState build so their contributions show up from the
+    // very first render, not just after a later refresh().
+    loadPlugins().finally(refresh);
   }, [refresh]);
 
   return (

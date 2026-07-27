@@ -1,11 +1,13 @@
 import FeedCard from "@/components/FeedCard";
 import type { ExplanationContext } from "@/types/explanation";
 import type { FeedItem, FeedTimelineGroup } from "@/types/feed";
+import type { PolicyDecision } from "@/types/policy";
 
 export default function FeedTimeline({
   groups,
   now = new Date(),
   explanationContext,
+  policyDecisionsByFeedItemId,
   onDismiss,
   onPin,
   onMarkRead,
@@ -13,6 +15,7 @@ export default function FeedTimeline({
   groups: FeedTimelineGroup[];
   now?: Date;
   explanationContext?: ExplanationContext;
+  policyDecisionsByFeedItemId?: Map<string, PolicyDecision>;
   onDismiss?: (item: FeedItem) => void;
   onPin?: (item: FeedItem) => void;
   onMarkRead?: (item: FeedItem) => void;
@@ -31,6 +34,7 @@ export default function FeedTimeline({
                 item={item}
                 now={now}
                 explanationContext={explanationContext}
+                policyDecision={policyDecisionsByFeedItemId?.get(item.id)}
                 onDismiss={onDismiss}
                 onPin={onPin}
                 onMarkRead={onMarkRead}

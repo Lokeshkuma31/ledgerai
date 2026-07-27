@@ -49,6 +49,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "forecast-summary": "Forecast",
   conversation: "Past Questions",
   explanation: "Explanations",
+  workflow: "Workflow Runs",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

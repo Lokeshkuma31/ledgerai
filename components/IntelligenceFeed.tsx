@@ -15,6 +15,7 @@ import { computeFeedStatistics } from "@/lib/feed/statistics";
 import { groupFeedItemsByTimeline } from "@/lib/feed/timeline";
 import type { ExplanationContext } from "@/types/explanation";
 import type { FeedItem } from "@/types/feed";
+import type { NotificationCandidate, PolicyDecision } from "@/types/policy";
 
 /**
  * The unified Financial Intelligence Feed — replaces the dashboard's
@@ -29,16 +30,30 @@ export default function IntelligenceFeed({
   items,
   now = new Date(),
   explanationContext,
+  notificationCandidates,
   onChange,
 }: {
   items: FeedItem[];
   now?: Date;
   explanationContext?: ExplanationContext;
+  /** Automation & Notification Policy Engine output — used only to show
+   * each card's policy status (Will Notify/Scheduled/Daily Briefing/
+   * Silent/Dismissed); the feed itself never depends on it. */
+  notificationCandidates?: NotificationCandidate[];
   onChange: () => void;
 }) {
   const [filterState, setFilterState] = useState<FeedFilterState>(emptyFeedFilterState());
 
   const statistics = useMemo(() => computeFeedStatistics(items), [items]);
+
+  const policyDecisionsByFeedItemId = useMemo(() => {
+    const map = new Map<string, PolicyDecision>();
+    for (const candidate of notificationCandidates ?? []) {
+      const feedItemId = candidate.metadata.feedItemId;
+      if (typeof feedItemId === "string") map.set(feedItemId, candidate.policyDecision);
+    }
+    return map;
+  }, [notificationCandidates]);
 
   const visible = useMemo(() => {
     const active = items.filter((item) => !item.isDismissed);
@@ -78,6 +93,7 @@ export default function IntelligenceFeed({
           groups={groups}
           now={now}
           explanationContext={explanationContext}
+          policyDecisionsByFeedItemId={policyDecisionsByFeedItemId}
           onDismiss={handleDismiss}
           onPin={handlePin}
           onMarkRead={handleMarkRead}

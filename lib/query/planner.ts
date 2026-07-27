@@ -14,6 +14,7 @@ const REQUIRED_ENGINES: Record<QueryIntent, string[]> = {
   "financial-events": ["Financial Events Engine"],
   recommendations: ["Financial Decision Engine"],
   "general-summary": ["Insights Engine", "Budget Engine", "Cash Flow Forecast Engine", "Recurring Transaction Engine"],
+  "workflow-status": ["Financial Workflow Engine"],
   unknown: [],
 };
 

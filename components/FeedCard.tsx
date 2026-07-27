@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { POLICY_DECISION_LABELS } from "@/components/PolicyDecisionCard";
 import PriorityBadge from "@/components/PriorityBadge";
 import SeverityBadge from "@/components/SeverityBadge";
 import WhyButton from "@/components/WhyButton";
@@ -14,6 +15,7 @@ import {
 } from "@/lib/explanations/engine";
 import type { Explanation, ExplanationContext } from "@/types/explanation";
 import type { FeedItem, FeedSourceEngine } from "@/types/feed";
+import type { PolicyDecision } from "@/types/policy";
 
 const SOURCE_ENGINE_LABELS: Record<FeedSourceEngine, string> = {
   budget: "Budget Engine",
@@ -88,6 +90,7 @@ export default function FeedCard({
   item,
   now = new Date(),
   explanationContext,
+  policyDecision,
   onDismiss,
   onPin,
   onMarkRead,
@@ -95,6 +98,10 @@ export default function FeedCard({
   item: FeedItem;
   now?: Date;
   explanationContext?: ExplanationContext;
+  /** The Automation & Notification Policy Engine's decision for this item,
+   * if the caller has one — shown as a small status chip (Will Notify /
+   * Scheduled / Daily Briefing / Silent / Dismissed / ...). */
+  policyDecision?: PolicyDecision;
   onDismiss?: (item: FeedItem) => void;
   onPin?: (item: FeedItem) => void;
   onMarkRead?: (item: FeedItem) => void;
@@ -114,8 +121,13 @@ export default function FeedCard({
             <SeverityBadge severity={item.severity} />
           </div>
         </div>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
           {SOURCE_ENGINE_LABELS[item.sourceEngine]} · {formatTimestamp(item.createdAt, now)}
+          {policyDecision && (
+            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+              {POLICY_DECISION_LABELS[policyDecision]}
+            </span>
+          )}
         </span>
         <p className="text-sm">{item.summary}</p>
         <div className="flex justify-end gap-2 pt-1">

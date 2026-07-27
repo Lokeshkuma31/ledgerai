@@ -5,6 +5,7 @@ import type { BudgetStatus } from "@/types/budget";
 import type { FinancialEvent } from "@/types/event";
 import type { FeedItem } from "@/types/feed";
 import type { CashFlowForecast, ForecastStatistics } from "@/types/forecast";
+import type { NotificationCandidate } from "@/types/policy";
 import type { Recommendation } from "@/types/recommendation";
 import type { RecurringStatistics, RecurringTransaction } from "@/types/recurring";
 
@@ -40,6 +41,10 @@ export interface FinancialState {
   /** Financial Intelligence Feed Engine output — the prioritized,
    * deduplicated feed every dashboard widget reads from. */
   feed: FeedItem[];
+  /** Automation & Notification Policy Engine output — one candidate per
+   * active feed item, deciding whether/when/how it deserves attention.
+   * Never sent anywhere; future delivery systems will consume this. */
+  notificationCandidates: NotificationCandidate[];
   coachSummary: CoachOutput | null;
   reviewStats: ReviewStats;
   memoryStats: MemoryStats;

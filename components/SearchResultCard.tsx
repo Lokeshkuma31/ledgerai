@@ -17,6 +17,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "forecast-summary": "Forecast",
   conversation: "Past Question",
   explanation: "Explanation",
+  workflow: "Workflow Run",
 };
 
 function formatAmount(amount: number): string {

@@ -15,6 +15,12 @@ export default function DashboardPage() {
             Recurring
           </Link>
           <Link
+            href="/goals"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Goals
+          </Link>
+          <Link
             href="/merchants"
             className="text-muted-foreground text-sm hover:underline"
           >
@@ -25,6 +31,18 @@ export default function DashboardPage() {
             className="text-muted-foreground text-sm hover:underline"
           >
             Search
+          </Link>
+          <Link
+            href="/workflows"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Workflows
+          </Link>
+          <Link
+            href="/plugins"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Plugins
           </Link>
           <Link
             href="/settings/import"
@@ -43,6 +61,12 @@ export default function DashboardPage() {
             className="text-muted-foreground text-sm hover:underline"
           >
             Memory
+          </Link>
+          <Link
+            href="/settings/notifications"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Notifications
           </Link>
         </div>
       </div>

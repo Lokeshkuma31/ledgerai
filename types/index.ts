@@ -15,6 +15,7 @@ export const INDEX_OBJECT_TYPES = [
   "forecast-summary",
   "conversation",
   "explanation",
+  "workflow",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 
@@ -60,6 +61,10 @@ export interface FinancialIndexSources {
   forecast: import("@/types/forecast").CashFlowForecast;
   conversationHistory: import("@/types/query").QueryResult[];
   explanations: import("@/types/explanation").Explanation[];
+  /** Optional — most callers (the Query Engine, the Search page) don't
+   * have workflow data on hand and don't need to; the Financial
+   * Intelligence Orchestrator is the one caller that passes it. */
+  workflowRuns?: import("@/types/workflow").WorkflowRun[];
   now: Date;
 }
 

@@ -34,6 +34,14 @@ export class SourceRegistry {
     }
     source.enabled = enabled;
   }
+
+  /** Removes a source entirely — used by the Plugin Framework's uninstall
+   * path (lib/plugins/sourceAdapter.ts) so a source plugin's unregister()
+   * isn't a no-op. Sources aren't expected to be re-registered afterward
+   * within the same session. */
+  unregister(id: string): void {
+    this.sources.delete(id);
+  }
 }
 
 export const sourceRegistry = new SourceRegistry();

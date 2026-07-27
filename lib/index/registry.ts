@@ -161,6 +161,7 @@ export function computeIndexSignature(sources: FinancialIndexSources): string {
     sources.forecast.forecastGeneratedAt,
     sources.conversationHistory.map((c) => c.id).join(","),
     sources.explanations.map((e) => `${e.id}:${e.lastUpdated}`).join(","),
+    (sources.workflowRuns ?? []).map((r) => `${r.runId}:${r.status}`).join(","),
   ];
   return parts.join("|");
 }
