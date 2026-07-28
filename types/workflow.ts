@@ -12,6 +12,11 @@ export const WORKFLOW_TRIGGERS = [
   "feed-updated",
   "daily-refresh",
   "manual-run",
+  "consent-granted",
+  "account-connected",
+  "sync-completed",
+  "sync-failed",
+  "disconnect",
 ] as const;
 export type WorkflowTrigger = (typeof WORKFLOW_TRIGGERS)[number];
 

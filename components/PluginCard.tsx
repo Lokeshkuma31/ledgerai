@@ -10,6 +10,7 @@ import type { PluginRecord } from "@/types/plugin";
  * for them and PluginCard renders no "Manage" link at all. */
 const PLUGIN_MANAGEMENT_URLS: Partial<Record<string, string>> = {
   "android-sms": "/plugins/android-sms",
+  "account-aggregator": "/plugins/account-aggregator",
 };
 
 function formatTimestamp(iso: string): string {

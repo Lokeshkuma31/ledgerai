@@ -53,6 +53,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "bank-account": "Bank Accounts",
   "bank-institution": "Bank Institutions",
   "bank-sync-run": "Bank Syncs",
+  consent: "Consents",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

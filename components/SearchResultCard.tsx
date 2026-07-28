@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   "bank-account": "Bank Account",
   "bank-institution": "Bank Institution",
   "bank-sync-run": "Bank Sync",
+  consent: "Consent",
 };
 
 function formatAmount(amount: number): string {

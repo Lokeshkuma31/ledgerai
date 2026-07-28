@@ -6,6 +6,11 @@
 // the same role AddExpenseDialog.tsx's `import { sourceRegistry } from
 // "@/lib/sources"` plays for the Transaction Source Framework.
 import "@/lib/banks/providers";
+// Same reason as above: registers the Account Aggregator plugin's
+// connector directly, so it shows up here even if /plugins or /dashboard
+// (which would otherwise register it via loadPlugins()) hasn't loaded yet
+// this session.
+import "@/plugins/account-aggregator/connector";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";

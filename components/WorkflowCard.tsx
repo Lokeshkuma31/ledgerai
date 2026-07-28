@@ -17,6 +17,11 @@ const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
   "feed-updated": "Feed Updated",
   "daily-refresh": "Daily Refresh",
   "manual-run": "Manual Run",
+  "consent-granted": "Consent Granted",
+  "account-connected": "Account Connected",
+  "sync-completed": "Sync Completed",
+  "sync-failed": "Sync Failed",
+  disconnect: "Disconnect",
 };
 
 const RUN_STATUS_STYLES: Record<WorkflowRunStatus, string> = {
