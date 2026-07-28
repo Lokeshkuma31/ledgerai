@@ -3,6 +3,7 @@ import { installPlugin } from "@/lib/plugins/lifecycle";
 import { getAllSourcePlugins } from "@/lib/plugins/sourceAdapter";
 import { androidSmsPlugin } from "@/plugins/android-sms/plugin";
 import { accountAggregatorPlugin } from "@/plugins/account-aggregator/plugin";
+import { documentIntelligencePlugin } from "@/plugins/document-intelligence/plugin";
 import type { Plugin } from "@/types/plugin";
 
 let hasLoaded = false;
@@ -14,7 +15,7 @@ let hasLoaded = false;
  * here as a new entry in this array.
  */
 function builtInPlugins(): Plugin[] {
-  return [...getAllSourcePlugins(), androidSmsPlugin, accountAggregatorPlugin];
+  return [...getAllSourcePlugins(), androidSmsPlugin, accountAggregatorPlugin, documentIntelligencePlugin];
 }
 
 /**

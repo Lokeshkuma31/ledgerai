@@ -20,6 +20,7 @@ export const INDEX_OBJECT_TYPES = [
   "bank-institution",
   "bank-sync-run",
   "consent",
+  "document",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 

@@ -11,6 +11,7 @@ import type { PluginRecord } from "@/types/plugin";
 const PLUGIN_MANAGEMENT_URLS: Partial<Record<string, string>> = {
   "android-sms": "/plugins/android-sms",
   "account-aggregator": "/plugins/account-aggregator",
+  "document-intelligence": "/documents",
 };
 
 function formatTimestamp(iso: string): string {
