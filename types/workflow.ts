@@ -17,6 +17,9 @@ export const WORKFLOW_TRIGGERS = [
   "sync-completed",
   "sync-failed",
   "disconnect",
+  "connection-token-refreshed",
+  "connection-failed",
+  "connection-permission-revoked",
 ] as const;
 export type WorkflowTrigger = (typeof WORKFLOW_TRIGGERS)[number];
 

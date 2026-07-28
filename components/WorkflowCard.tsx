@@ -22,6 +22,9 @@ const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
   "sync-completed": "Sync Completed",
   "sync-failed": "Sync Failed",
   disconnect: "Disconnect",
+  "connection-token-refreshed": "Connection Token Refreshed",
+  "connection-failed": "Connection Failed",
+  "connection-permission-revoked": "Connection Permission Revoked",
 };
 
 const RUN_STATUS_STYLES: Record<WorkflowRunStatus, string> = {

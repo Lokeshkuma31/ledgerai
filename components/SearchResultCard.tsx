@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   consent: "Consent",
   document: "Document",
   email: "Email",
+  connection: "Connection",
 };
 
 function formatAmount(amount: number): string {

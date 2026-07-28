@@ -56,6 +56,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   consent: "Consents",
   document: "Documents",
   email: "Emails",
+  connection: "Connections",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

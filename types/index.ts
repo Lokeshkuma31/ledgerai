@@ -22,6 +22,7 @@ export const INDEX_OBJECT_TYPES = [
   "consent",
   "document",
   "email",
+  "connection",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 

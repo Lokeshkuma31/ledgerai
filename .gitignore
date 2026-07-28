@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Connection Hub — server-only encrypted token store (never commit)
+/.connections-data/
+
 # claude code local settings
 .claude/settings.local.json
 
