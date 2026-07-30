@@ -64,17 +64,19 @@ export default function DocumentIntelligenceDashboard() {
       {pending.length > 0 && (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Upload Preview</span>
-          {pending.map((record) => (
-            <DocumentPreview
-              key={record.id}
-              record={record}
-              busy={busyIds.has(record.id)}
-              onImport={(force) => void withBusy(record.id, () => importDocument(record.id, { force }))}
-              onSkip={() => void withBusy(record.id, () => skipDocument(record.id))}
-              onReject={() => void withBusy(record.id, () => rejectDocument(record.id))}
-              onSaveEdits={(patch: Partial<ExtractedFields>) => void withBusy(record.id, () => editDocumentFields(record.id, patch))}
-            />
-          ))}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {pending.map((record) => (
+              <DocumentPreview
+                key={record.id}
+                record={record}
+                busy={busyIds.has(record.id)}
+                onImport={(force) => void withBusy(record.id, () => importDocument(record.id, { force }))}
+                onSkip={() => void withBusy(record.id, () => skipDocument(record.id))}
+                onReject={() => void withBusy(record.id, () => rejectDocument(record.id))}
+                onSaveEdits={(patch: Partial<ExtractedFields>) => void withBusy(record.id, () => editDocumentFields(record.id, patch))}
+              />
+            ))}
+          </div>
         </div>
       )}
 

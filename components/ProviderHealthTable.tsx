@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SyncEngineHealth } from "@/lib/sync/types";
 
@@ -10,11 +11,11 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-const CONNECTION_STYLES: Record<string, string> = {
-  healthy: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  degraded: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  offline: "bg-destructive/10 text-destructive",
-  unknown: "bg-muted text-muted-foreground",
+const CONNECTION_VARIANT: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+  healthy: "success",
+  degraded: "warning",
+  offline: "destructive",
+  unknown: "secondary",
 };
 
 function formatTimestamp(iso: string | null): string {
@@ -65,12 +66,9 @@ export default function ProviderHealthTable({ health }: { health: SyncEngineHeal
                     </div>
                   </td>
                   <td className="py-2 pr-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${CONNECTION_STYLES[provider.connection.status]}`}
-                      title={provider.connection.message}
-                    >
+                    <Badge variant={CONNECTION_VARIANT[provider.connection.status]} title={provider.connection.message}>
                       {provider.connection.status}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="py-2 pr-3">{provider.queueSize}</td>
                   <td className="py-2 pr-3">{provider.runningJobs}</td>

@@ -1,7 +1,9 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import RunStatusBadge from "@/components/RunStatusBadge";
 import WorkflowTimeline, { pendingSteps } from "@/components/WorkflowTimeline";
-import type { WorkflowDefinition, WorkflowRun, WorkflowRunStatus, WorkflowTrigger } from "@/types/workflow";
+import type { WorkflowDefinition, WorkflowRun, WorkflowTrigger } from "@/types/workflow";
 
 const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
   "transaction-imported": "Transaction Imported",
@@ -28,13 +30,6 @@ const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
   "connection-token-refreshed": "Connection Token Refreshed",
   "connection-failed": "Connection Failed",
   "connection-permission-revoked": "Connection Permission Revoked",
-};
-
-const RUN_STATUS_STYLES: Record<WorkflowRunStatus, string> = {
-  completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  failed: "bg-destructive/10 text-destructive",
-  partial: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  running: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
 };
 
 function formatTimestamp(iso: string): string {
@@ -67,7 +62,7 @@ export default function WorkflowCard({
   onRunNow?: (workflow: WorkflowDefinition) => void;
 }) {
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
@@ -77,27 +72,17 @@ export default function WorkflowCard({
             </span>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs whitespace-nowrap">
-              {TRIGGER_LABELS[workflow.trigger]}
-            </span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${
-                workflow.status === "enabled"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
+            <Badge variant="secondary">{TRIGGER_LABELS[workflow.trigger]}</Badge>
+            <Badge variant={workflow.status === "enabled" ? "success" : "secondary"}>
               {workflow.status === "enabled" ? "Enabled" : "Disabled"}
-            </span>
+            </Badge>
           </div>
         </div>
         <p className="text-sm">{workflow.description}</p>
         {workflow.lastRun && (
           <span className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
             Last run:
-            <span className={`rounded-full px-2 py-0.5 ${RUN_STATUS_STYLES[workflow.lastRun.status]}`}>
-              {workflow.lastRun.status}
-            </span>
+            <RunStatusBadge status={workflow.lastRun.status} />
             {formatTimestamp(workflow.lastRun.startedAt)} · {workflow.lastRun.durationMs ?? 0}ms ·{" "}
             {workflow.lastRun.successfulSteps}/{workflow.steps.length} steps
           </span>

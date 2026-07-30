@@ -7,14 +7,14 @@ const STATUS_STYLES: Record<GoalStatus, { bar: string; label: string; text: stri
     text: "text-muted-foreground",
   },
   "in-progress": {
-    bar: "bg-blue-500",
+    bar: "bg-primary",
     label: "In Progress",
-    text: "text-blue-600 dark:text-blue-400",
+    text: "text-primary",
   },
   completed: {
-    bar: "bg-emerald-500",
+    bar: "bg-success",
     label: "Completed",
-    text: "text-emerald-600 dark:text-emerald-400",
+    text: "text-success",
   },
   overdue: {
     bar: "bg-destructive",

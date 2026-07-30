@@ -1,14 +1,8 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { WorkflowRun, WorkflowRunStatus } from "@/types/workflow";
-
-const STATUS_STYLES: Record<WorkflowRunStatus, string> = {
-  completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  failed: "bg-destructive/10 text-destructive",
-  partial: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  running: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-};
+import RunStatusBadge from "@/components/RunStatusBadge";
+import type { WorkflowRun } from "@/types/workflow";
 
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
@@ -53,11 +47,7 @@ export default function WorkflowHistory({
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">{run.workflowName}</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[run.status]}`}
-            >
-              {run.status}
-            </span>
+            <RunStatusBadge status={run.status} />
           </div>
           <span className="text-muted-foreground text-xs">
             {run.trigger} · {formatTimestamp(run.startedAt)} · {run.durationMs ?? 0}ms ·{" "}

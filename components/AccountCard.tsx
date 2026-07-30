@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { BankAccount } from "@/lib/banks/types";
 import type { Transaction } from "@/types/transaction";
@@ -20,11 +21,11 @@ function formatTimestamp(iso: string | null): string {
   });
 }
 
-const STATUS_STYLES: Record<BankAccount["status"], string> = {
-  active: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  inactive: "bg-muted text-muted-foreground",
-  closed: "bg-muted text-muted-foreground",
-  error: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Record<BankAccount["status"], "success" | "secondary" | "destructive"> = {
+  active: "success",
+  inactive: "secondary",
+  closed: "secondary",
+  error: "destructive",
 };
 
 export default function AccountCard({
@@ -44,9 +45,9 @@ export default function AccountCard({
               {account.institution} · {account.accountType.replace("-", " ")} · {account.maskedNumber}
             </span>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap capitalize ${STATUS_STYLES[account.status]}`}>
+          <Badge variant={STATUS_VARIANT[account.status]} className="capitalize">
             {account.status}
-          </span>
+          </Badge>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex flex-col gap-0.5">

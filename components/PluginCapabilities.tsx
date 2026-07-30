@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import type { PluginCapability } from "@/types/plugin";
 
 const CAPABILITY_LABELS: Record<PluginCapability, string> = {
@@ -19,9 +20,9 @@ export default function PluginCapabilities({ capabilities }: { capabilities: Plu
   return (
     <div className="flex flex-wrap gap-1">
       {capabilities.map((capability) => (
-        <span key={capability} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+        <Badge key={capability} variant="secondary">
           {CAPABILITY_LABELS[capability]}
-        </span>
+        </Badge>
       ))}
     </div>
   );

@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import ConnectionHealth from "@/components/ConnectionHealth";
 import ScopeViewer from "@/components/ScopeViewer";
@@ -50,9 +51,9 @@ export default function ConnectionDetails({ record, descriptor }: { record: Conn
           <span className="text-muted-foreground text-xs font-medium">Capabilities</span>
           <div className="flex flex-wrap gap-1">
             {descriptor.supportedCapabilities.map((cap) => (
-              <span key={cap} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+              <Badge key={cap} variant="secondary">
                 {CAPABILITY_LABELS[cap] ?? cap}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>

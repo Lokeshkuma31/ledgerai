@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui/badge";
+
 const SCOPE_LABELS: Record<string, string> = {
   openid: "Identity",
   email: "Email address",
@@ -19,9 +21,9 @@ export default function ScopeViewer({ scopes }: { scopes: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {scopes.map((scope) => (
-        <span key={scope} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs" title={scope}>
+        <Badge key={scope} variant="secondary" title={scope}>
           {labelFor(scope)}
-        </span>
+        </Badge>
       ))}
     </div>
   );

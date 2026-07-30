@@ -1,18 +1,19 @@
+import { Badge } from "@/components/ui/badge";
 import type { ImportRowStatus, SmsImportPreviewRow } from "@/plugins/android-sms/types";
 
-function statusBadgeClass(status: ImportRowStatus): string {
+function statusVariant(status: ImportRowStatus): "success" | "warning" | "destructive" | "secondary" | "info" {
   switch (status) {
     case "Ready":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "success";
     case "Duplicate":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+      return "warning";
     case "Malformed":
     case "Unknown Format":
-      return "bg-destructive/10 text-destructive";
+      return "destructive";
     case "Skipped":
-      return "bg-muted text-muted-foreground";
+      return "secondary";
     case "Imported":
-      return "bg-primary/10 text-primary";
+      return "info";
   }
 }
 
@@ -74,9 +75,7 @@ export default function SMSPreviewTable({
                   {row.normalized ? `${Math.round(row.normalized.confidence * 100)}%` : "—"}
                 </td>
                 <td className="px-2 py-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${statusBadgeClass(row.status)}`}>
-                    {row.status}
-                  </span>
+                  <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
                 </td>
               </tr>
             );

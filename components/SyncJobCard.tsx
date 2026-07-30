@@ -1,16 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { SyncJob, SyncJobStatus, SyncProvider } from "@/lib/sync/types";
-
-const STATUS_STYLES: Record<SyncJobStatus, string> = {
-  queued: "bg-muted text-muted-foreground",
-  running: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  paused: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  partial: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  failed: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
-};
+import SyncJobStatusBadge from "@/components/SyncJobStatusBadge";
+import type { SyncJob, SyncProvider } from "@/lib/sync/types";
 
 const CATEGORY_LABELS: Record<SyncProvider["category"], string> = {
   email: "Email",
@@ -54,18 +45,14 @@ export default function SyncJobCard({
   const canResume = (latestJob?.status === "paused" || latestJob?.status === "cancelled") && latestJob.lastCheckpoint !== null;
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
             <span className="text-sm font-medium">{provider.name}</span>
             <span className="text-muted-foreground text-xs">{CATEGORY_LABELS[provider.category]}</span>
           </div>
-          {latestJob && (
-            <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[latestJob.status]}`}>
-              {latestJob.status}
-            </span>
-          )}
+          {latestJob && <SyncJobStatusBadge status={latestJob.status} />}
         </div>
 
         {latestJob ? (

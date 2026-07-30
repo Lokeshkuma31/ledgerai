@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import PluginHealthBadge from "@/components/PluginHealthBadge";
 import type { PluginHealth } from "@/types/plugin";
@@ -36,15 +37,9 @@ export default function SMSHealthCard({
           <span className="text-sm font-medium">Plugin Status</span>
           <div className="flex items-center gap-1.5">
             <PluginHealthBadge status={health.status} />
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${
-                enabled
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
+            <Badge variant={enabled ? "success" : "secondary"}>
               {enabled ? "Enabled" : "Disabled"}
-            </span>
+            </Badge>
           </div>
         </div>
         <p className="text-muted-foreground text-xs">{health.message}</p>

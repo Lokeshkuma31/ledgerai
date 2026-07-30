@@ -1,12 +1,13 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Consent, ConsentStatus } from "@/plugins/account-aggregator/types";
 
-const STATUS_STYLES: Record<ConsentStatus, string> = {
-  Pending: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  Granted: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  Denied: "bg-destructive/10 text-destructive",
-  Expired: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  Revoked: "bg-muted text-muted-foreground",
+const STATUS_VARIANT: Record<ConsentStatus, "info" | "success" | "destructive" | "warning" | "secondary"> = {
+  Pending: "info",
+  Granted: "success",
+  Denied: "destructive",
+  Expired: "warning",
+  Revoked: "secondary",
 };
 
 function formatTimestamp(iso: string | null): string {
@@ -30,16 +31,14 @@ export default function ConsentCard({ consent }: { consent: Consent | null }) {
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <span className="text-sm font-medium">Consent Status</span>
-          <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[consent.status]}`}>
-            {consent.status}
-          </span>
+          <Badge variant={STATUS_VARIANT[consent.status]}>{consent.status}</Badge>
         </div>
         <p className="text-muted-foreground text-xs">{consent.purpose}</p>
         <div className="flex flex-wrap gap-1">
           {consent.permissions.map((p) => (
-            <span key={p} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs capitalize">
+            <Badge key={p} variant="secondary" className="capitalize">
               {p.replace(/-/g, " ")}
-            </span>
+            </Badge>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">

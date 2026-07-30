@@ -140,21 +140,23 @@ export default function BankDashboard() {
           </Button>
         </div>
       )}
-      {records.map((record) => (
-        <BankCard
-          key={record.id}
-          record={record}
-          accounts={accountsByConnector.get(record.id) ?? []}
-          syncRuns={historyByConnector.get(record.id) ?? []}
-          transactionsByAccount={transactionsByAccount}
-          busy={busyIds.has(record.id)}
-          onConnect={() => handleConnect(record.id)}
-          onDisconnect={() => handleDisconnect(record.id)}
-          onToggleEnabled={() => handleToggleEnabled(record)}
-          onRetry={() => handleRetry(record.id)}
-          onSynced={refresh}
-        />
-      ))}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {records.map((record) => (
+          <BankCard
+            key={record.id}
+            record={record}
+            accounts={accountsByConnector.get(record.id) ?? []}
+            syncRuns={historyByConnector.get(record.id) ?? []}
+            transactionsByAccount={transactionsByAccount}
+            busy={busyIds.has(record.id)}
+            onConnect={() => handleConnect(record.id)}
+            onDisconnect={() => handleDisconnect(record.id)}
+            onToggleEnabled={() => handleToggleEnabled(record)}
+            onRetry={() => handleRetry(record.id)}
+            onSynced={refresh}
+          />
+        ))}
+      </div>
     </div>
   );
 }

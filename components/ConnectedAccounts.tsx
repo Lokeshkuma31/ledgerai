@@ -23,9 +23,11 @@ export default function ConnectedAccounts({
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium">Connected Accounts</span>
-      {accounts.map((account) => (
-        <AccountCard key={account.id} account={account} recentTransactions={transactionsByAccount.get(account.id) ?? []} />
-      ))}
+      <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+        {accounts.map((account) => (
+          <AccountCard key={account.id} account={account} recentTransactions={transactionsByAccount.get(account.id) ?? []} />
+        ))}
+      </div>
     </div>
   );
 }

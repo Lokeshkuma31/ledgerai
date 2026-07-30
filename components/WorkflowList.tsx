@@ -30,7 +30,7 @@ export default function WorkflowList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       {[...workflows]
         .sort((a, b) => b.priority - a.priority)
         .map((workflow) => (

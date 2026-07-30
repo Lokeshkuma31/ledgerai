@@ -126,18 +126,20 @@ export default function EmailDashboard() {
             </CardContent>
           </Card>
         ) : (
-          providers.map((record) => (
-            <EmailProviderCard
-              key={record.id}
-              record={record}
-              history={historyByProvider.get(record.id) ?? []}
-              busy={busyIds.has(record.id)}
-              onConnect={() => handleConnect(record.id)}
-              onDisconnect={() => handleDisconnect(record.id)}
-              onSync={() => handleSync(record.id)}
-              onToggleEnabled={() => handleToggleEnabled(record)}
-            />
-          ))
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {providers.map((record) => (
+              <EmailProviderCard
+                key={record.id}
+                record={record}
+                history={historyByProvider.get(record.id) ?? []}
+                busy={busyIds.has(record.id)}
+                onConnect={() => handleConnect(record.id)}
+                onDisconnect={() => handleDisconnect(record.id)}
+                onSync={() => handleSync(record.id)}
+                onToggleEnabled={() => handleToggleEnabled(record)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -146,17 +148,19 @@ export default function EmailDashboard() {
       {pending.length > 0 && (
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Pending Imports</span>
-          {pending.map((record) => (
-            <EmailPreview
-              key={record.id}
-              record={record}
-              busy={busyIds.has(record.id)}
-              onImport={(force) => void withBusy(record.id, () => importEmail(record.id, { force }))}
-              onSkip={() => void withBusy(record.id, () => skipEmail(record.id))}
-              onReject={() => void withBusy(record.id, () => rejectEmail(record.id))}
-              onSaveEdits={(patch: Partial<ExtractedEmailFields>) => void withBusy(record.id, () => editEmailFields(record.id, patch))}
-            />
-          ))}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {pending.map((record) => (
+              <EmailPreview
+                key={record.id}
+                record={record}
+                busy={busyIds.has(record.id)}
+                onImport={(force) => void withBusy(record.id, () => importEmail(record.id, { force }))}
+                onSkip={() => void withBusy(record.id, () => skipEmail(record.id))}
+                onReject={() => void withBusy(record.id, () => rejectEmail(record.id))}
+                onSaveEdits={(patch: Partial<ExtractedEmailFields>) => void withBusy(record.id, () => editEmailFields(record.id, patch))}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

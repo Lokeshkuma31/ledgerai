@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -73,7 +74,7 @@ export default function ProviderCard({ descriptor, record }: { descriptor: Provi
   const needsReconnect = record ? RECONNECT_STATUSES.has(record.status) : false;
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardHeader className="flex flex-row items-start justify-between gap-2">
         <div className="flex flex-col">
           {renaming ? (
@@ -93,13 +94,9 @@ export default function ProviderCard({ descriptor, record }: { descriptor: Provi
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           {record && <ConnectionHealth status={record.health.status} />}
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap capitalize ${
-              connected ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
-            }`}
-          >
+          <Badge variant={connected ? "success" : "secondary"} className="capitalize">
             {(record?.status ?? "not-connected").replace(/-/g, " ")}
-          </span>
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

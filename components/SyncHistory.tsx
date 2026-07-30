@@ -1,15 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
-import type { SyncJob, SyncJobStatus } from "@/lib/sync/types";
-
-const STATUS_STYLES: Record<SyncJobStatus, string> = {
-  queued: "bg-muted text-muted-foreground",
-  running: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  paused: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  partial: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  failed: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
-};
+import SyncJobStatusBadge from "@/components/SyncJobStatusBadge";
+import type { SyncJob } from "@/lib/sync/types";
 
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -43,9 +34,7 @@ export default function SyncHistory({ jobs }: { jobs: SyncJob[] }) {
           <div key={job.id} className="border-border rounded-lg border px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{job.plugin}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[job.status]}`}>
-                {job.status}
-              </span>
+              <SyncJobStatusBadge status={job.status} />
             </div>
             <span className="text-muted-foreground text-xs">
               {job.type} · {formatTimestamp(job.queuedAt)}

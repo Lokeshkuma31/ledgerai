@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SyncRun } from "@/lib/banks/types";
 
@@ -39,9 +40,9 @@ export default function SyncStatus({ latestRun }: { latestRun: SyncRun | undefin
           <span className="text-muted-foreground text-xs font-medium">Supported Capabilities</span>
           <div className="flex flex-wrap gap-1">
             {CAPABILITIES.map((c) => (
-              <span key={c} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+              <Badge key={c} variant="secondary">
                 {c}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>

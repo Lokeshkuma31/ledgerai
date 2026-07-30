@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import WhyButton from "@/components/WhyButton";
 import { explainSearchResult } from "@/lib/explanations/engine";
@@ -41,14 +42,12 @@ export default function SearchResultCard({
 }) {
   const { object } = item;
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardContent className="flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                {TYPE_LABELS[object.type]}
-              </span>
+              <Badge variant="secondary">{TYPE_LABELS[object.type]}</Badge>
               {object.date && <span className="text-muted-foreground text-xs">{object.date}</span>}
             </div>
             <span className="text-sm font-semibold">{object.title}</span>
@@ -61,9 +60,9 @@ export default function SearchResultCard({
         {object.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {object.tags.map((tag) => (
-              <span key={tag} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+              <Badge key={tag} variant="secondary">
                 {tag}
-              </span>
+              </Badge>
             ))}
           </div>
         )}

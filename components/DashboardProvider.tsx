@@ -52,11 +52,11 @@ export function useDashboard(): DashboardContextValue {
 }
 
 /**
- * Owns the Dashboard's only round trip through storage and the Financial
- * Intelligence Orchestrator. Everything downstream — DashboardLayout,
- * DashboardSections, and every card/list under them — reads exclusively
- * from the FinancialState this provides; none of them touch an engine or
- * localStorage directly.
+ * Owns the round trip through storage and the Financial Intelligence
+ * Orchestrator, mounted once by app/(app)/layout.tsx. Every page under the
+ * (app) route group — the Dashboard overview, Budgets, Forecast, Insights,
+ * Feed, AI Coach — reads exclusively from the FinancialState this
+ * provides; none of them touch an engine or localStorage directly.
  */
 export default function DashboardProvider({
   children,

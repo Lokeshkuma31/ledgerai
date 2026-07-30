@@ -253,10 +253,11 @@ export default function MerchantDirectory() {
           </CardContent>
         </Card>
       ) : (
-        visibleMerchants.map((merchant) => {
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {visibleMerchants.map((merchant) => {
           const candidates = merchants.filter((m) => m.id !== merchant.id);
           return (
-            <Card key={merchant.id}>
+            <Card key={merchant.id} className="hover:ring-primary/30 transition-shadow hover:shadow-md">
               <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <CardTitle className="text-base">
                   {merchant.canonicalName}
@@ -310,7 +311,8 @@ export default function MerchantDirectory() {
               </CardContent>
             </Card>
           );
-        })
+        })}
+        </div>
       )}
     </div>
   );

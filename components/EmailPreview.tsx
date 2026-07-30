@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import AttachmentList from "@/components/AttachmentList";
+import ImportStatusBadge from "@/components/ImportStatusBadge";
 import OCRConfidenceBadge from "@/components/OCRConfidenceBadge";
 import type { EmailRecord, ExtractedEmailFields } from "@/lib/email/types";
 
@@ -25,15 +26,6 @@ const TYPE_LABELS: Record<string, string> = {
   "investment-report": "Investment Report",
   "tax-document": "Tax Document",
   unknown: "Unknown Email",
-};
-
-const STATUS_STYLES: Record<EmailRecord["status"], string> = {
-  processed: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  duplicate: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  imported: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  skipped: "bg-muted text-muted-foreground",
-  rejected: "bg-muted text-muted-foreground",
-  failed: "bg-destructive/10 text-destructive",
 };
 
 function formatAmount(amount: number | undefined, currency?: string): string {
@@ -113,7 +105,7 @@ export default function EmailPreview({
   }
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardHeader className="flex flex-row items-start justify-between gap-2">
         <div className="flex flex-col">
           <CardTitle className="text-base">{record.subject}</CardTitle>
@@ -123,14 +115,14 @@ export default function EmailPreview({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           <OCRConfidenceBadge confidence={record.classificationConfidence} label="Classification" />
-          <span className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap capitalize ${STATUS_STYLES[record.status]}`}>{record.status}</span>
+          <ImportStatusBadge status={record.status} />
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {record.matchedRules.length > 0 && <p className="text-muted-foreground text-xs">Matched rules: {record.matchedRules.join(", ")}</p>}
 
         {record.validationErrors.length > 0 && (
-          <div className="flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <div className="border-warning/30 bg-warning/10 text-warning flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs">
             {record.validationErrors.map((error, index) => (
               <span key={index}>{error.message}</span>
             ))}

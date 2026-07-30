@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SearchStatistics as SearchStatisticsType } from "@/types/index";
 
@@ -13,9 +14,9 @@ export default function SearchStatistics({ stats }: { stats: SearchStatisticsTyp
         </div>
         <div className="flex flex-wrap gap-1.5">
           {typeEntries.map(([type, count]) => (
-            <span key={type} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+            <Badge key={type} variant="secondary">
               {type}: {count}
-            </span>
+            </Badge>
           ))}
         </div>
         <div className="flex items-center justify-between">
@@ -27,9 +28,9 @@ export default function SearchStatistics({ stats }: { stats: SearchStatisticsTyp
             <span className="text-muted-foreground text-xs">Most Searched</span>
             <div className="flex flex-wrap gap-1.5">
               {stats.mostSearchedTerms.map((t) => (
-                <span key={t.term} className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+                <Badge key={t.term} variant="secondary">
                   {t.term} ({t.count})
-                </span>
+                </Badge>
               ))}
             </div>
           </div>

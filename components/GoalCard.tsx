@@ -23,7 +23,7 @@ export default function GoalCard({
   }
 
   return (
-    <Card>
+    <Card className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 font-medium">
