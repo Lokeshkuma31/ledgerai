@@ -57,6 +57,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   document: "Documents",
   email: "Emails",
   connection: "Connections",
+  "sync-job": "Sync Jobs",
 };
 
 const SORT_LABELS: Record<SearchSortMode, string> = {

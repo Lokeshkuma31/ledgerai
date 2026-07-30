@@ -9,7 +9,7 @@ import {
   type CoachOutput,
   type MerchantCoachSummary,
 } from "@/lib/coach/coach";
-import { collectCoachAccountSummaries, collectCoachImportSummaries } from "@/lib/coach/contributors";
+import { collectCoachAccountSummaries, collectCoachImportSummaries, collectCoachSyncSummaries } from "@/lib/coach/contributors";
 import { generateRecommendations } from "@/lib/decision/engine";
 import { applyPersistedStatus } from "@/lib/decision/storage";
 import { detectFinancialEvents } from "@/lib/events/engine";
@@ -459,6 +459,11 @@ export async function buildFinancialState(
   // via registerCoachAccountSummaryContributor.
   const accountSummaries = collectCoachAccountSummaries();
 
+  // The Unified Synchronization Engine publishes one summary per completed
+  // sync job across every connected provider the same way — via
+  // registerCoachSyncSummaryContributor.
+  const syncSummaries = collectCoachSyncSummaries();
+
   let coachSummary: CoachOutput | null = null;
   if (transactions.length > 0) {
     try {
@@ -476,6 +481,7 @@ export async function buildFinancialState(
         goalSummaries.map((g) => `${g.name}:${g.currentAmount}`),
         importSummaries.map((s) => `${s.pluginName}:${s.importedCount}:${s.lastImportAt}`),
         accountSummaries.map((a) => `${a.connectedAccountCount}:${a.combinedBalance}:${a.staleAccounts.length}`),
+        syncSummaries.map((s) => `${s.providerName}:${s.status}:${s.itemsImported}:${s.completedAt}`),
       );
       const cached = loadCoachCache();
       if (cached && cached.signature === signature) {
@@ -500,6 +506,7 @@ export async function buildFinancialState(
           goalSummaries,
           importSummaries,
           accountSummaries,
+          syncSummaries,
         });
         saveCoachCache(signature, coachSummary);
       }

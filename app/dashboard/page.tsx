@@ -51,6 +51,12 @@ export default function DashboardPage() {
             Banks
           </Link>
           <Link
+            href="/sync"
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Sync
+          </Link>
+          <Link
             href="/settings/import"
             className="text-muted-foreground text-sm hover:underline"
           >

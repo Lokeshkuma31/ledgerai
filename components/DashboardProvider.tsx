@@ -9,6 +9,16 @@
 // server-rendered page.
 import "@/lib/banks/providers";
 
+// Side-effect imports: register every provider with the Unified
+// Synchronization Engine (lib/sync/engine.ts) the same way — each adapter
+// wraps an already-existing framework's real sync logic (Bank Connector
+// Framework, Email Intelligence Framework, Android SMS) rather than
+// re-implementing it, so /sync has something to show from the first load.
+import "@/lib/banks/syncAdapter";
+import "@/lib/email/syncAdapter";
+import "@/plugins/android-sms/syncAdapter";
+import "@/lib/sync/engine";
+
 import {
   createContext,
   useCallback,

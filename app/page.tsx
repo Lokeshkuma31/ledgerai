@@ -10,13 +10,23 @@ export default function Home() {
       <p className="text-muted-foreground max-w-md text-lg">
         Your personal AI financial copilot.
       </p>
-      <Button
-        size="lg"
-        nativeButton={false}
-        render={<Link href="/dashboard" />}
-      >
-        Get Started
-      </Button>
+      <div className="flex flex-col items-center gap-3 sm:flex-row">
+        <Button
+          size="lg"
+          nativeButton={false}
+          render={<Link href="/dashboard" />}
+        >
+          Get Started
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/api/connections/google/authorize" />}
+        >
+          Continue with Google
+        </Button>
+      </div>
     </main>
   );
 }

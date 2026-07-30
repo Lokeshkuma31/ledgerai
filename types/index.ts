@@ -23,6 +23,7 @@ export const INDEX_OBJECT_TYPES = [
   "document",
   "email",
   "connection",
+  "sync-job",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 

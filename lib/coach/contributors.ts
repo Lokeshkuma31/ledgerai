@@ -86,3 +86,43 @@ export function collectCoachAccountSummaries(): BankCoachAccountSummary[] {
   }
   return summaries;
 }
+
+/**
+ * Same extension point, shaped for the Unified Synchronization Engine
+ * instead: one already-computed summary per completed sync job, across
+ * every connected provider (Email, Bank, SMS, Document, future plugins).
+ * The Coach only narrates these ("Gmail synchronized 8 new financial
+ * emails...") — it never executes or decides a synchronization itself.
+ */
+export interface SyncCoachSummary {
+  providerName: string;
+  category: string;
+  itemsImported: number;
+  itemsSkipped: number;
+  duplicates: number;
+  status: string;
+  completedAt: string | null;
+}
+
+const syncSummaryContributors = new Set<() => SyncCoachSummary[]>();
+
+export function registerCoachSyncSummaryContributor(
+  contributor: () => SyncCoachSummary[],
+): () => void {
+  syncSummaryContributors.add(contributor);
+  return () => {
+    syncSummaryContributors.delete(contributor);
+  };
+}
+
+export function collectCoachSyncSummaries(): SyncCoachSummary[] {
+  const summaries: SyncCoachSummary[] = [];
+  for (const contributor of syncSummaryContributors) {
+    try {
+      summaries.push(...contributor());
+    } catch (error) {
+      console.error("A sync-summary plugin threw while contributing to the Coach:", error);
+    }
+  }
+  return summaries;
+}

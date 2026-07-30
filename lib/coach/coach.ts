@@ -1,7 +1,7 @@
 "use server";
 
 import { generateText } from "@/lib/ai/provider";
-import type { BankCoachAccountSummary, CoachImportSummaryContribution } from "@/lib/coach/contributors";
+import type { BankCoachAccountSummary, CoachImportSummaryContribution, SyncCoachSummary } from "@/lib/coach/contributors";
 import type { Insights } from "@/lib/insights/engine";
 import type { TimelineGroup } from "@/lib/timeline/engine";
 import type { BudgetStatus } from "@/types/budget";
@@ -98,6 +98,13 @@ export interface CoachInput {
    * balance, or decide what counts as "stale" itself. Empty when no bank
    * accounts are connected. */
   accountSummaries: BankCoachAccountSummary[];
+  /** Already-executed by the Unified Synchronization Engine via
+   * registerCoachSyncSummaryContributor — one summary per completed sync
+   * job across every connected provider (Email, Bank, SMS, Document,
+   * future plugins). The LLM only narrates these; it must never trigger,
+   * decide, or re-run a synchronization itself. Empty when nothing has
+   * synced yet. */
+  syncSummaries: SyncCoachSummary[];
 }
 
 export interface CoachOutput {
@@ -255,6 +262,15 @@ function buildAnalyticsPayload(input: CoachInput) {
         daysSinceSync: s.daysSinceSync,
       })),
     })),
+    sync: input.syncSummaries.map((s) => ({
+      provider: s.providerName,
+      category: s.category,
+      status: s.status,
+      itemsImported: s.itemsImported,
+      itemsSkipped: s.itemsSkipped,
+      duplicates: s.duplicates,
+      completedAt: s.completedAt,
+    })),
   };
 }
 
@@ -275,6 +291,7 @@ function buildPrompt(analytics: ReturnType<typeof buildAnalyticsPayload>): strin
     "The `goals` field lists the user's savings goals, each already computed by a deterministic Goals Engine — `percentComplete`, `daysRemaining`, `status`, and `monthlySavingsNeeded` (the pace required to hit the target on time) are already-correct facts. Do not recalculate any of these, invent a payoff date, or estimate a different required pace yourself — only explain what they mean and, if relevant, whether the user's current spending pattern supports that pace.",
     "The `importSummaries` field (if non-empty) lists transaction-source plugins (e.g. an Android SMS & notification importer) and how many messages each already processed, imported, skipped as duplicates, or failed to parse — already computed by that plugin, never by you. Only mention this as brief background context (e.g. 'most of your recent transactions came in automatically from your SMS import') when relevant to the question at hand; never re-parse a message or second-guess the counts.",
     "The `accounts` field (if non-empty) lists connected bank/card/wallet account summaries already computed by the Bank Connector Framework — `connectedAccountCount`, `combinedBalance`, and any `staleAccounts` (accounts that haven't synced recently, with `daysSinceSync`). Treat these as already-correct facts: do not recalculate a balance, invent an account, or decide staleness yourself. Only mention this as background context when relevant (e.g. noting a stale account the user should reconnect), the way the milestone's own example does: 'You currently have 3 connected accounts with a combined balance of $12,450. One account has not synchronized in 3 days.'",
+    "The `sync` field (if non-empty) lists synchronization jobs already executed by the Unified Synchronization Engine across every connected provider (Email, Bank, SMS, Document, future plugins) — each has `provider`, `category`, `status`, `itemsImported`, `itemsSkipped`, `duplicates`, and `completedAt`. Do not recalculate these counts, invent a sync you weren't told about, or decide when something should sync — only summarize what already happened, in plain language, e.g. 'Gmail synchronized 8 new financial emails, your bank connector imported 12 transactions, and Android SMS detected 3 new UPI payments.' Never claim to execute or trigger a synchronization yourself.",
     "Your job is only to explain spending patterns and give personalized, actionable financial advice based on the structured analytics below.",
     "",
     "Analytics (JSON):",

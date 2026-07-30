@@ -25,6 +25,7 @@ const TYPE_LABELS: Record<IndexObjectType, string> = {
   document: "Document",
   email: "Email",
   connection: "Connection",
+  "sync-job": "Sync Job",
 };
 
 function formatAmount(amount: number): string {
