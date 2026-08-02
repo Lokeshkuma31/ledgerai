@@ -92,7 +92,15 @@ export async function answerQuery(
       JSON.stringify(context);
   }
 
-  const result: QueryResult = { id, question, intent: plan.intent, answer, context, createdAt };
+  const result: QueryResult = {
+    id,
+    question,
+    intent: plan.intent,
+    answer,
+    context,
+    createdAt,
+    requiredEngines: plan.requiredEngines,
+  };
   result.explanation = explainQueryResponse(result, explanationContext);
   return result;
 }

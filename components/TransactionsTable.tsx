@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { useDashboard } from "@/components/DashboardProvider";
 import ReviewTransactionDialog from "@/components/ReviewTransactionDialog";
+import CategoryIcon from "@/components/shared/CategoryIcon";
+import MerchantAvatar from "@/components/shared/MerchantAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -177,13 +180,19 @@ export default function TransactionsTable() {
                   <TableRow key={t.id}>
                     <TableCell className="font-numeric text-muted-foreground">{formatDate(t.date)}</TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{merchantOf(t)}</span>
-                        <span className="text-muted-foreground text-xs">{t.paymentMethod}</span>
-                      </div>
+                      <Link href={`/transactions/${t.id}`} className="flex items-center gap-2.5 hover:underline">
+                        <MerchantAvatar name={merchantOf(t)} size="sm" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{merchantOf(t)}</span>
+                          <span className="text-muted-foreground text-xs">{t.paymentMethod}</span>
+                        </div>
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{categoryOf(t)}</Badge>
+                      <Badge variant="outline">
+                        <CategoryIcon category={categoryOf(t)} />
+                        {categoryOf(t)}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={t.reviewed ? "secondary" : "outline"}>

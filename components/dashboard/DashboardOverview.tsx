@@ -2,16 +2,19 @@
 
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import AddExpenseDialog from "@/components/AddExpenseDialog";
 import BudgetsMini from "@/components/dashboard/BudgetsMini";
 import CashFlowChart from "@/components/dashboard/CashFlowChart";
 import ConnectionsMini from "@/components/dashboard/ConnectionsMini";
+import DashboardTimeline from "@/components/dashboard/DashboardTimeline";
 import MetricCard from "@/components/dashboard/MetricCard";
+import NeedsAttention from "@/components/dashboard/NeedsAttention";
+import QuickActions from "@/components/dashboard/QuickActions";
 import RecentActivity from "@/components/dashboard/RecentActivity";
+import TodaysIntelligence from "@/components/dashboard/TodaysIntelligence";
 import UpcomingBills from "@/components/dashboard/UpcomingBills";
+import WelcomeArea from "@/components/dashboard/WelcomeArea";
 import { useDashboard } from "@/components/DashboardProvider";
-import ImportDialog from "@/components/ImportDialog";
-import RecommendationCard from "@/components/RecommendationCard";
+import { buildAttentionItems } from "@/lib/attention/aggregator";
 import { generateMonthlyCashFlow } from "@/lib/timeline/monthly";
 import { getTransactions } from "@/lib/storage";
 import type { ConnectionRecord } from "@/lib/connections/types";
@@ -35,6 +38,23 @@ export default function DashboardOverview({ connections }: { connections: Connec
     [state?.generatedAt],
   );
 
+  const attentionItems = useMemo(() => {
+    if (!state) return [];
+    return buildAttentionItems({
+      budgets: state.budgets,
+      recurring: state.recurring,
+      feed: state.feed,
+      connections,
+    });
+  }, [state, connections]);
+
+  const feedHighlights = useMemo(() => {
+    if (!state) return [];
+    return state.feed.filter(
+      (item) => !item.isDismissed && (item.severity === "positive" || item.severity === "info") && item.type !== "recommendation",
+    );
+  }, [state]);
+
   if (!state) return null;
 
   const hasTransactions = state.dashboardStats.totalTransactions > 0;
@@ -51,89 +71,94 @@ export default function DashboardOverview({ connections }: { connections: Connec
     <div className="flex flex-col gap-6">
       {isLoading && <p className="text-muted-foreground text-xs">Refreshing…</p>}
 
-      <div className="flex justify-end gap-2">
-        <ImportDialog onImported={refresh} />
-        <AddExpenseDialog onAdd={refresh} />
-      </div>
+      <WelcomeArea state={state} connections={connections} />
 
       {!hasTransactions ? (
-        <Card>
-          <CardContent>
-            <p className="text-muted-foreground">
-              No transactions yet — import a CSV or add an expense to see your overview.
-            </p>
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardContent>
+              <p className="text-muted-foreground">
+                No transactions yet — import a CSV or add an expense to get started.
+              </p>
+            </CardContent>
+          </Card>
+          <QuickActions onDataChanged={refresh} />
+        </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <MetricCard
-              label="Balance Estimate"
-              value={formatAmount(state.forecast.currentBalanceEstimate)}
-              badgeText={`Net this month ${state.forecastStatistics.netCashFlow >= 0 ? "+" : ""}${formatAmount(state.forecastStatistics.netCashFlow)}`}
-              badgeTone={state.forecastStatistics.netCashFlow >= 0 ? "up" : "down"}
-              sparklineValues={balanceTrend}
-              color="primary"
-            />
-            <MetricCard
-              label="Projected Month-End"
-              value={formatAmount(state.forecast.projectedEndOfMonthBalance)}
-              badgeText={`${Math.round(state.forecast.confidence * 100)}% confidence`}
-              badgeTone="neutral"
-              color="ai"
-            />
-            <MetricCard
-              label="Expected Expenses"
-              value={formatAmount(state.forecast.expectedExpenses)}
-              badgeText={expenseDelta.text}
-              badgeTone={expenseDelta.tone === "up" ? "down" : expenseDelta.tone === "down" ? "up" : "neutral"}
-              sparklineValues={expenseTrend}
-              color="warning"
-            />
-            <MetricCard
-              label="Expected Income"
-              value={formatAmount(state.forecast.expectedIncome)}
-              badgeText={incomeDelta.text}
-              badgeTone={incomeDelta.tone}
-              sparklineValues={incomeTrend}
-              color="success"
-            />
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+              <MetricCard
+                label="Balance Estimate"
+                value={formatAmount(state.forecast.currentBalanceEstimate)}
+                badgeText={`Net this month ${state.forecastStatistics.netCashFlow >= 0 ? "+" : ""}${formatAmount(state.forecastStatistics.netCashFlow)}`}
+                badgeTone={state.forecastStatistics.netCashFlow >= 0 ? "up" : "down"}
+                sparklineValues={balanceTrend}
+                color="primary"
+              />
+              <MetricCard
+                label="Projected Month-End"
+                value={formatAmount(state.forecast.projectedEndOfMonthBalance)}
+                badgeText={`${Math.round(state.forecast.confidence * 100)}% confidence`}
+                badgeTone="neutral"
+                color="ai"
+              />
+              <MetricCard
+                label="Expected Expenses"
+                value={formatAmount(state.forecast.expectedExpenses)}
+                badgeText={expenseDelta.text}
+                badgeTone={expenseDelta.tone === "up" ? "down" : expenseDelta.tone === "down" ? "up" : "neutral"}
+                sparklineValues={expenseTrend}
+                color="warning"
+              />
+              <MetricCard
+                label="Expected Income"
+                value={formatAmount(state.forecast.expectedIncome)}
+                badgeText={incomeDelta.text}
+                badgeTone={incomeDelta.tone}
+                sparklineValues={incomeTrend}
+                color="success"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Cash Flow</CardTitle>
+                  <p className="text-muted-foreground text-xs">Income vs. spending · trailing 6 months</p>
+                </CardHeader>
+                <CardContent>
+                  <CashFlowChart data={monthly} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Upcoming Bills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <UpcomingBills items={state.recurring} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cash Flow</CardTitle>
-                <p className="text-muted-foreground text-xs">Income vs. spending · trailing 6 months</p>
-              </CardHeader>
-              <CardContent>
-                <CashFlowChart data={monthly} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Upcoming Bills</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <UpcomingBills items={state.recurring} />
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Needs Attention</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NeedsAttention items={attentionItems} />
+            </CardContent>
+          </Card>
 
-          {newRecommendations.length > 0 && (
-            <Card className="from-ai/10 to-card border-ai/30 bg-gradient-to-br">
-              <CardHeader>
-                <CardTitle className="text-base">AI Recommendations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  {newRecommendations.map((rec) => (
-                    <RecommendationCard key={rec.id} recommendation={rec} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Today&apos;s Intelligence</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TodaysIntelligence recommendations={newRecommendations} feedHighlights={feedHighlights} />
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
             <Card>
@@ -163,6 +188,24 @@ export default function DashboardOverview({ connections }: { connections: Connec
               </Card>
             </div>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <QuickActions onDataChanged={refresh} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DashboardTimeline timeline={state.timeline} />
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

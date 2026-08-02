@@ -1,18 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import CategoryIcon from "@/components/shared/CategoryIcon";
+import MerchantAvatar from "@/components/shared/MerchantAvatar";
 import MerchantKnowledgeBadge from "@/components/MerchantKnowledgeBadge";
+import MerchantRecurringList from "@/components/MerchantRecurringList";
+import MerchantSpendChart from "@/components/MerchantSpendChart";
 import WhyButton from "@/components/WhyButton";
 import { explainMerchantProfile } from "@/lib/explanations/engine";
 import { generateForecast } from "@/lib/forecast/engine";
 import { generateInsights } from "@/lib/insights/engine";
 import { getAllMerchantProfiles, getMerchantProfile } from "@/lib/merchant/knowledge";
+import { detectRecurringTransactions } from "@/lib/recurring/engine";
 import { getTransactions } from "@/lib/storage";
+import { generateMonthlyCashFlow } from "@/lib/timeline/monthly";
 import { generateTimeline } from "@/lib/timeline/engine";
 import type { ExplanationContext } from "@/types/explanation";
 import type { MerchantProfile as MerchantProfileType } from "@/types/merchant-profile";
+import type { RecurringTransaction } from "@/types/recurring";
 import type { Transaction } from "@/types/transaction";
 
 function formatDate(iso: string): string {
@@ -38,7 +45,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function MerchantProfile({ merchantId }: { merchantId: string }) {
   const [profile, setProfile] = useState<MerchantProfileType | null | undefined>(undefined);
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [merchantTransactions, setMerchantTransactions] = useState<Transaction[]>([]);
+  const [merchantRecurring, setMerchantRecurring] = useState<RecurringTransaction[]>([]);
   const [explanationContext, setExplanationContext] = useState<ExplanationContext | null>(null);
 
   useEffect(() => {
@@ -46,18 +54,21 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
     setProfile(found);
     if (found) {
       const transactions = getTransactions();
-      setRecentTransactions(transactions.filter((t) => t.merchantId === merchantId).slice(0, 10));
+      setMerchantTransactions(transactions.filter((t) => t.merchantId === merchantId));
 
       const now = new Date();
       const insights = generateInsights(transactions);
       const timeline = generateTimeline(transactions, now);
+      const merchantProfiles = getAllMerchantProfiles();
+      const recurring = detectRecurringTransactions(transactions, merchantProfiles, now).items;
+      setMerchantRecurring(recurring.filter((r) => r.merchantId === merchantId));
       setExplanationContext({
         transactions,
         budgets: [],
         events: [],
         recommendations: [],
         recurring: [],
-        merchantProfiles: getAllMerchantProfiles(),
+        merchantProfiles,
         forecast: generateForecast(transactions, [], [], insights, timeline, now),
         insights,
         timeline,
@@ -65,6 +76,12 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
       });
     }
   }, [merchantId]);
+
+  const recentTransactions = useMemo(() => merchantTransactions.slice(0, 10), [merchantTransactions]);
+  const spendChartData = useMemo(
+    () => generateMonthlyCashFlow(merchantTransactions, 6),
+    [merchantTransactions],
+  );
 
   if (profile === undefined) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
@@ -84,13 +101,16 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {profile.canonicalName}
-          </h1>
-          {explanationContext && (
-            <WhyButton explain={() => explainMerchantProfile(profile, explanationContext)} />
-          )}
+        <div className="flex items-center gap-3">
+          <MerchantAvatar name={profile.canonicalName} size="lg" />
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {profile.canonicalName}
+            </h1>
+            {explanationContext && (
+              <WhyButton explain={() => explainMerchantProfile(profile, explanationContext)} />
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           <MerchantKnowledgeBadge label={profile.industry} />
@@ -121,6 +141,25 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Spending Trend</CardTitle>
+          <p className="text-muted-foreground text-xs">Trailing 6 months</p>
+        </CardHeader>
+        <CardContent>
+          <MerchantSpendChart data={spendChartData} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recurring Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MerchantRecurringList items={merchantRecurring} />
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold tracking-tight">Aliases</h2>
         {profile.aliases.length === 0 ? (
@@ -141,17 +180,22 @@ export default function MerchantProfile({ merchantId }: { merchantId: string }) 
         ) : (
           <div className="flex flex-col gap-2">
             {recentTransactions.map((t) => (
-              <Card key={t.id} size="sm">
-                <CardContent className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-sm">{t.note}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {formatDate(t.date)}
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold">{formatAmount(t.amount)}</span>
-                </CardContent>
-              </Card>
+              <Link key={t.id} href={`/transactions/${t.id}`}>
+                <Card size="sm" className="hover:ring-primary/30 transition-shadow hover:shadow-md">
+                  <CardContent className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <CategoryIcon category={t.userCategory ?? t.aiCategory} />
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm">{t.note}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {formatDate(t.date)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold">{formatAmount(t.amount)}</span>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

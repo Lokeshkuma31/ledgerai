@@ -313,6 +313,37 @@ export function indexExplanations(explanations: Explanation[]): IndexedObject[] 
   );
 }
 
+/** Static — Settings has no per-user records to index, just the fixed set
+ * of sections the app exposes. Closes the "Settings isn't searchable" gap:
+ * previously the only entity types indexed were user data, never the
+ * app's own configuration surface. */
+const SETTINGS_PAGES: { title: string; description: string; keywords: string[]; href: string }[] = [
+  { title: "Profile", description: "Your name and account details.", keywords: ["profile", "account", "name"], href: "/settings" },
+  { title: "Appearance", description: "Theme — light, dark, or system.", keywords: ["appearance", "theme", "dark mode", "light mode"], href: "/settings" },
+  { title: "Connections", description: "Connected email and bank accounts.", keywords: ["connections", "oauth", "gmail", "outlook", "yahoo"], href: "/connections" },
+  { title: "Notifications", description: "Alert preferences, quiet hours, and channels.", keywords: ["notifications", "alerts", "quiet hours"], href: "/settings/notifications" },
+  { title: "AI", description: "AI provider and model configuration.", keywords: ["ai", "coach", "provider", "model"], href: "/settings" },
+  { title: "Privacy", description: "Data handling and privacy controls.", keywords: ["privacy", "data"], href: "/settings" },
+  { title: "Security", description: "Account security settings.", keywords: ["security", "password"], href: "/settings" },
+  { title: "Imports", description: "CSV import history.", keywords: ["imports", "csv", "history"], href: "/settings/import" },
+  { title: "Plugins", description: "Enable or disable transaction sources.", keywords: ["plugins", "sources"], href: "/settings/sources" },
+  { title: "Advanced", description: "Learned categorization memory.", keywords: ["advanced", "memory"], href: "/settings/memory" },
+];
+
+export function indexSettingsPages(now: Date): IndexedObject[] {
+  return SETTINGS_PAGES.map((page) =>
+    makeObject("settings", {
+      id: `settings:${page.title.toLowerCase()}`,
+      title: page.title,
+      description: page.description,
+      keywords: page.keywords,
+      metadata: { href: page.href },
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }),
+  );
+}
+
 export function indexWorkflowRuns(runs: WorkflowRun[]): IndexedObject[] {
   return runs.map((run) =>
     makeObject("workflow", {
@@ -356,6 +387,7 @@ export function buildFinancialIndex(sources: FinancialIndexSources): FinancialIn
     ...indexConversationHistory(sources.conversationHistory),
     ...indexExplanations(sources.explanations),
     ...indexWorkflowRuns(sources.workflowRuns ?? []),
+    ...indexSettingsPages(sources.now),
   ];
 
   const counts = {} as Record<IndexObjectType, number>;

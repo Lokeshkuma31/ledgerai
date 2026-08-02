@@ -1,6 +1,10 @@
 import BankDashboard from "@/components/BankDashboard";
+import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
+import { getConnections } from "@/lib/connections/engine";
 
 export default function BanksPage() {
+  const connections = getConnections();
+
   return (
     <div className="flex flex-col gap-8">
       <p className="text-muted-foreground max-w-2xl text-sm">
@@ -9,6 +13,7 @@ export default function BanksPage() {
         interfaces, so a real bank integration can replace a demo connector
         later without changing anything else here.
       </p>
+      <DataSourceStatusStrip connections={connections} />
       <BankDashboard />
     </div>
   );

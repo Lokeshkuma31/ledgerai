@@ -1,4 +1,5 @@
 import ConnectionHub from "@/components/ConnectionHub";
+import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
 import { getConnections, getProviderDescriptors } from "@/lib/connections/engine";
 
 export default async function ConnectionsPage({
@@ -18,6 +19,7 @@ export default async function ConnectionsPage({
         page. Email synchronization itself is a future milestone; this hub
         only manages the authenticated connection.
       </p>
+      <DataSourceStatusStrip connections={connections} />
       <ConnectionHub
         descriptors={descriptors}
         connections={connections}

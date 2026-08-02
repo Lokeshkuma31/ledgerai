@@ -3,9 +3,10 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Bell, Moon, Monitor, Search, Sun } from "lucide-react";
+import { Moon, Monitor, Search, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import NotificationBell from "@/components/app-shell/NotificationBell";
 import { getPageTitle } from "@/lib/nav";
 
 const THEME_CYCLE = ["dark", "light", "system"] as const;
@@ -76,15 +77,7 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
       >
         <ThemeIcon />
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        aria-label="Notifications"
-        title="Notifications"
-      >
-        <Bell />
-      </Button>
+      <NotificationBell />
     </header>
   );
 }

@@ -1,4 +1,5 @@
 import { XIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import WhyButton from "@/components/WhyButton";
@@ -35,6 +36,16 @@ export default function QueryResult({
           </Button>
         </div>
         <p className="text-muted-foreground text-sm">{result.answer}</p>
+        {result.requiredEngines && result.requiredEngines.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-muted-foreground text-xs">Context:</span>
+            {result.requiredEngines.map((engine) => (
+              <Badge key={engine} variant="secondary">
+                {engine}
+              </Badge>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground text-xs">{formatTimestamp(result.createdAt)}</span>
           {result.explanation && <WhyButton explain={() => result.explanation!} />}

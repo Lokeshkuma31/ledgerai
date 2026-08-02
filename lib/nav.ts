@@ -21,33 +21,41 @@ import {
   Workflow,
 } from "lucide-react";
 
+/** Groups the sidebar/Cmd+K use to communicate priority instead of a flat
+ * 19-item list — see the design spec's Information Architecture phase.
+ * Optional so a NavItem without one still renders (ungrouped, in a flat
+ * list) rather than being silently dropped. */
+export const NAV_GROUPS = ["Overview", "Money", "Data Sources", "System"] as const;
+export type NavGroup = (typeof NAV_GROUPS)[number];
+
 export interface NavItem {
   id: string;
   label: string;
   href: string;
   icon: LucideIcon;
+  group?: NavGroup;
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { id: "transactions", label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
-  { id: "connections", label: "Connections", href: "/connections", icon: Link2 },
-  { id: "documents", label: "Documents", href: "/documents", icon: FileText },
-  { id: "emails", label: "Emails", href: "/email", icon: Mail },
-  { id: "merchants", label: "Merchants", href: "/merchants", icon: Store },
-  { id: "budgets", label: "Budgets", href: "/budgets", icon: PiggyBank },
-  { id: "recurring", label: "Recurring", href: "/recurring", icon: Repeat },
-  { id: "feed", label: "Feed", href: "/feed", icon: Inbox },
-  { id: "forecast", label: "Forecast", href: "/forecast", icon: TrendingUp },
-  { id: "insights", label: "Insights", href: "/insights", icon: Lightbulb },
-  { id: "goals", label: "Goals", href: "/goals", icon: Target },
-  { id: "ai-coach", label: "AI Coach", href: "/ai-coach", icon: Sparkles },
-  { id: "search", label: "Search", href: "/search", icon: Search },
-  { id: "workflows", label: "Workflows", href: "/workflows", icon: Workflow },
-  { id: "plugins", label: "Plugins", href: "/plugins", icon: Puzzle },
-  { id: "banks", label: "Banks", href: "/banks", icon: Landmark },
-  { id: "sync", label: "Sync", href: "/sync", icon: RefreshCw },
-  { id: "settings", label: "Settings", href: "/settings", icon: Settings },
+  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Overview" },
+  { id: "ai-coach", label: "AI Coach", href: "/ai-coach", icon: Sparkles, group: "Overview" },
+  { id: "search", label: "Search", href: "/search", icon: Search, group: "Overview" },
+  { id: "transactions", label: "Transactions", href: "/transactions", icon: ArrowLeftRight, group: "Money" },
+  { id: "merchants", label: "Merchants", href: "/merchants", icon: Store, group: "Money" },
+  { id: "budgets", label: "Budgets", href: "/budgets", icon: PiggyBank, group: "Money" },
+  { id: "recurring", label: "Recurring", href: "/recurring", icon: Repeat, group: "Money" },
+  { id: "forecast", label: "Forecast", href: "/forecast", icon: TrendingUp, group: "Money" },
+  { id: "insights", label: "Insights", href: "/insights", icon: Lightbulb, group: "Money" },
+  { id: "goals", label: "Goals", href: "/goals", icon: Target, group: "Money" },
+  { id: "connections", label: "Connections", href: "/connections", icon: Link2, group: "Data Sources" },
+  { id: "documents", label: "Documents", href: "/documents", icon: FileText, group: "Data Sources" },
+  { id: "emails", label: "Emails", href: "/email", icon: Mail, group: "Data Sources" },
+  { id: "banks", label: "Banks", href: "/banks", icon: Landmark, group: "Data Sources" },
+  { id: "sync", label: "Sync", href: "/sync", icon: RefreshCw, group: "Data Sources" },
+  { id: "feed", label: "Feed", href: "/feed", icon: Inbox, group: "System" },
+  { id: "workflows", label: "Workflows", href: "/workflows", icon: Workflow, group: "System" },
+  { id: "plugins", label: "Plugins", href: "/plugins", icon: Puzzle, group: "System" },
+  { id: "settings", label: "Settings", href: "/settings", icon: Settings, group: "System" },
 ];
 
 /** Known sub-route titles that aren't a top-level nav destination on their own. */

@@ -87,4 +87,9 @@ export interface QueryResult {
    * with its own supporting evidence and confidence. Optional only because
    * older persisted history entries (pre-dating this field) won't have one. */
   explanation?: import("@/types/explanation").Explanation;
+  /** Copied from ExecutionPlan.requiredEngines — which engines fed this
+   * specific answer, surfaced in the AI Coach workspace's "Context Sources"
+   * disclosure. Optional because older persisted history entries won't
+   * have one. */
+  requiredEngines?: string[];
 }

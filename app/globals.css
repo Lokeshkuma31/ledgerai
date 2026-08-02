@@ -58,6 +58,24 @@
 }
 
 /*
+ * Motion tokens — named duration/easing scale so new interactive/animated
+ * components share one vocabulary instead of each hardcoding its own
+ * duration-* utility (the pattern every pre-existing animated element in
+ * this app used, e.g. the budget progress bar's duration-500). Consumed by
+ * lib/motion.ts (typed JS constants mirroring these same values) and
+ * directly as CSS var() where a component needs it inline.
+ */
+:root {
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-moderate: 350ms;
+  --motion-duration-slow: 500ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --motion-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+}
+
+/*
  * Ledgerline design tokens, ported from the "Ledgerline design system demo"
  * Claude Design reference. Dark is the primary/default theme; light is a
  * direct tonal inversion of the same 3-tier surface system

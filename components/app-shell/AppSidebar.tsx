@@ -8,13 +8,32 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { NAV_ITEMS } from "@/lib/nav";
+import { NAV_GROUPS, NAV_ITEMS, type NavItem } from "@/lib/nav";
+
+const UNGROUPED = NAV_ITEMS.filter((item) => !item.group);
+const BY_GROUP = NAV_GROUPS.map((group) => ({
+  group,
+  items: NAV_ITEMS.filter((item) => item.group === group),
+})).filter((section) => section.items.length > 0);
+
+function NavMenuItem({ item, pathname }: { item: NavItem; pathname: string }) {
+  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+  return (
+    <SidebarMenuItem key={item.id}>
+      <SidebarMenuButton isActive={isActive} tooltip={item.label} render={<Link href={item.href} />}>
+        <item.icon />
+        <span>{item.label}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -38,28 +57,29 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
-                const isActive =
-                  pathname === item.href || pathname.startsWith(item.href + "/");
-                return (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.label}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {UNGROUPED.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {UNGROUPED.map((item) => (
+                  <NavMenuItem key={item.id} item={item} pathname={pathname} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {BY_GROUP.map(({ group, items }) => (
+          <SidebarGroup key={group}>
+            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <NavMenuItem key={item.id} item={item} pathname={pathname} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

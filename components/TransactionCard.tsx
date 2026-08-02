@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import ClassificationSourceBadge from "@/components/ClassificationSourceBadge";
 import ReviewTransactionDialog from "@/components/ReviewTransactionDialog";
 import { getMerchantProfile } from "@/lib/merchant/knowledge";
 import type { Category, Transaction } from "@/types/transaction";
@@ -65,17 +66,7 @@ export default function TransactionCard({
           <span className="text-muted-foreground text-xs">Category</span>
           <span className="flex items-center gap-1.5">
             {transaction.classificationSource && (
-              <span
-                className={
-                  transaction.classificationSource === "memory"
-                    ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400"
-                    : "bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
-                }
-              >
-                {transaction.classificationSource === "memory"
-                  ? "Learned"
-                  : "AI"}
-              </span>
+              <ClassificationSourceBadge source={transaction.classificationSource} />
             )}
             <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
               {formatClassification(transaction)}

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import PinToggleButton from "@/components/PinToggleButton";
 import RecommendationBadge from "@/components/RecommendationBadge";
 import WhyButton from "@/components/WhyButton";
 import { explainRecommendation } from "@/lib/explanations/engine";
@@ -11,11 +12,17 @@ export default function RecommendationCard({
   onDismiss,
   onComplete,
   explanationContext,
+  pinned,
+  onTogglePin,
 }: {
   recommendation: Recommendation;
   onDismiss?: (recommendation: Recommendation) => void;
   onComplete?: (recommendation: Recommendation) => void;
   explanationContext?: ExplanationContext;
+  /** Omit both to leave the card exactly as it was — pinning is opt-in per
+   * call site (used by the AI Coach workspace, not the Dashboard). */
+  pinned?: boolean;
+  onTogglePin?: (id: string) => void;
 }) {
   return (
     <Card size="sm">
@@ -35,8 +42,11 @@ export default function RecommendationCard({
             {recommendation.action}
           </span>
         </div>
-        {(onDismiss || onComplete || explanationContext) && (
+        {(onDismiss || onComplete || explanationContext || onTogglePin) && (
           <div className="flex justify-end gap-2 pt-1">
+            {onTogglePin && (
+              <PinToggleButton pinned={!!pinned} onToggle={() => onTogglePin(recommendation.id)} />
+            )}
             {explanationContext && (
               <WhyButton explain={() => explainRecommendation(recommendation, explanationContext)} />
             )}

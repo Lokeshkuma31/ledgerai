@@ -24,6 +24,7 @@ export const INDEX_OBJECT_TYPES = [
   "email",
   "connection",
   "sync-job",
+  "settings",
 ] as const;
 export type IndexObjectType = (typeof INDEX_OBJECT_TYPES)[number];
 
