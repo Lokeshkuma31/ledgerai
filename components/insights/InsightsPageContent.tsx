@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CategoryBarChart from "@/components/insights/CategoryBarChart";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
@@ -37,6 +38,9 @@ export default function InsightsPageContent() {
           <CategoryBreakdown breakdown={state.insights.categoryBreakdown} />
         </CardContent>
       </Card>
+      <Link href="/analytics" className="text-primary self-start text-sm hover:underline">
+        View full analytics →
+      </Link>
     </div>
   );
 }

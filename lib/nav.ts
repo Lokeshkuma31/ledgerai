@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  BarChart3,
   FileText,
   Inbox,
   Landmark,
@@ -40,6 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Overview" },
   { id: "ai-coach", label: "AI Coach", href: "/ai-coach", icon: Sparkles, group: "Overview" },
   { id: "search", label: "Search", href: "/search", icon: Search, group: "Overview" },
+  { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3, group: "Money" },
   { id: "transactions", label: "Transactions", href: "/transactions", icon: ArrowLeftRight, group: "Money" },
   { id: "merchants", label: "Merchants", href: "/merchants", icon: Store, group: "Money" },
   { id: "budgets", label: "Budgets", href: "/budgets", icon: PiggyBank, group: "Money" },
