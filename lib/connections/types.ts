@@ -94,6 +94,13 @@ export interface TokenSet {
  */
 export interface StoredConnection {
   id: string;
+  /** Owning Better Auth user — added when the registry moved off the
+   * single-implicit-user file store to a real, multi-user Postgres table
+   * (see repositories/connection-repository.ts). Every other function in
+   * this module that operates on a single already-known connection id
+   * still takes only that id, since id is globally unique; only
+   * account-lookup/listing functions need this to scope their query. */
+  userId: string;
   provider: ProviderId;
   providerAccountId: string;
   displayName: string;
@@ -157,6 +164,10 @@ export interface OAuthConnectInput {
   code: string;
   codeVerifier: string;
   redirectUri: string;
+  /** The signed-in Better Auth user completing this connection — resolved
+   * from the session by the Route Handler, which is the one place that
+   * has request context. */
+  userId: string;
   /** Set when this call is completing a Reconnect rather than a fresh
    * Connect — engine.ts updates this existing record in place instead of
    * creating a duplicate. */

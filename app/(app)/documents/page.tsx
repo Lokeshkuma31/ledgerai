@@ -1,9 +1,11 @@
 import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
 import DocumentIntelligenceDashboard from "@/components/DocumentIntelligenceDashboard";
 import { getConnections } from "@/lib/connections/engine";
+import { getCurrentUserId } from "@/lib/auth/session";
 
-export default function DocumentsPage() {
-  const connections = getConnections();
+export default async function DocumentsPage() {
+  const userId = await getCurrentUserId();
+  const connections = userId ? await getConnections(userId) : [];
 
   return (
     <div className="flex flex-col gap-8">

@@ -11,6 +11,7 @@ import { checkConnectionHealth } from "@/lib/connections/health";
 import { getProvider, PROVIDERS } from "@/lib/connections/providers";
 import {
   getAllConnectionRecords,
+  getAllConnectionRecordsUnscoped,
   getConnectionRecord,
   getStoredConnection,
   recordHealth,
@@ -50,6 +51,9 @@ export interface CompleteConnectionInput {
   code: string;
   codeVerifier: string;
   redirectUri: string;
+  /** The signed-in Better Auth user completing this connection — resolved
+   * from the session by the Route Handler. */
+  userId: string;
   existingConnectionId?: string;
 }
 
@@ -64,44 +68,49 @@ export async function completeConnection(input: CompleteConnectionInput): Promis
     code: input.code,
     codeVerifier: input.codeVerifier,
     redirectUri: input.redirectUri,
+    userId: input.userId,
     existingConnectionId: input.existingConnectionId,
   });
   await runWorkflowsForTrigger("account-connected", { connectionId: stored.id, provider: stored.provider, email: stored.email }, new Date());
+  await refreshConnectionCache();
   return toConnectionRecord(stored);
 }
 
 // --- Disconnect / Refresh / Rename ------------------------------------------
 
 export async function disconnectConnection(id: string): Promise<ConnectionRecord | undefined> {
-  const existing = getStoredConnection(id);
+  const existing = await getStoredConnection(id);
   if (!existing) return undefined;
   await getProvider(existing.provider).disconnect(id);
   await runWorkflowsForTrigger("disconnect", { connectionId: id, provider: existing.provider }, new Date());
+  await refreshConnectionCache();
   return getConnectionRecord(id);
 }
 
 export async function refreshConnection(id: string): Promise<ConnectionRecord> {
-  const existing = getStoredConnection(id);
+  const existing = await getStoredConnection(id);
   if (!existing) throw new Error(`Connection "${id}" not found.`);
 
   try {
     const updated = await getProvider(existing.provider).refreshToken(id);
     await runWorkflowsForTrigger("connection-token-refreshed", { connectionId: id, provider: existing.provider }, new Date());
+    await refreshConnectionCache();
     return toConnectionRecord(updated);
   } catch (error) {
-    const latest = getStoredConnection(id) ?? existing;
+    const latest = (await getStoredConnection(id)) ?? existing;
     const trigger = latest.status === "permission-revoked" ? "connection-permission-revoked" : "connection-failed";
     await runWorkflowsForTrigger(
       trigger,
       { connectionId: id, provider: existing.provider, error: error instanceof Error ? error.message : "Unknown error" },
       new Date(),
     );
+    await refreshConnectionCache();
     throw error;
   }
 }
 
-export function renameConnection(id: string, displayName: string): ConnectionRecord | undefined {
-  const existing = getStoredConnection(id);
+export async function renameConnection(id: string, displayName: string): Promise<ConnectionRecord | undefined> {
+  const existing = await getStoredConnection(id);
   if (!existing) return undefined;
   const trimmed = displayName.trim();
   if (!trimmed) return toConnectionRecord(existing);
@@ -109,7 +118,8 @@ export function renameConnection(id: string, displayName: string): ConnectionRec
   const now = new Date().toISOString();
   const event: ConnectionHistoryEvent = { type: "renamed", at: now, message: `Renamed to "${trimmed}".` };
   const updated = { ...existing, displayName: trimmed, lastActivity: now, history: [...existing.history, event].slice(-50) };
-  upsertStoredConnection(updated);
+  await upsertStoredConnection(updated);
+  await refreshConnectionCache();
   return toConnectionRecord(updated);
 }
 
@@ -118,27 +128,28 @@ export function renameConnection(id: string, displayName: string): ConnectionRec
  * returns the result. Fires the matching Workflow trigger when health
  * degrades to a state the spec calls out. */
 export async function checkAndRecordHealth(id: string): Promise<ConnectionRecord | undefined> {
-  const existing = getStoredConnection(id);
+  const existing = await getStoredConnection(id);
   if (!existing) return undefined;
 
   const health = await checkConnectionHealth(getProvider(existing.provider), existing);
-  recordHealth(id, health);
+  await recordHealth(id, health);
 
   if (health.status === "permission-revoked") {
     await runWorkflowsForTrigger("connection-permission-revoked", { connectionId: id, provider: existing.provider }, new Date());
   } else if (health.status === "authentication-failed") {
     await runWorkflowsForTrigger("connection-failed", { connectionId: id, provider: existing.provider }, new Date());
   }
+  await refreshConnectionCache();
   return getConnectionRecord(id);
 }
 
 // --- Reads (UI-safe) ---------------------------------------------------------
 
-export function getConnections(): ConnectionRecord[] {
-  return getAllConnectionRecords();
+export async function getConnections(userId: string): Promise<ConnectionRecord[]> {
+  return getAllConnectionRecords(userId);
 }
 
-export function getConnectionDetails(id: string): ConnectionRecord | undefined {
+export async function getConnectionDetails(id: string): Promise<ConnectionRecord | undefined> {
   return getConnectionRecord(id);
 }
 
@@ -155,6 +166,34 @@ export function getProviderDescriptors(): ProviderDescriptor[] {
 }
 
 // --- Feed / Search / Coach contributions -----------------------------------
+
+/**
+ * registerFeedContributor/registerIndexContributor/
+ * registerCoachImportSummaryContributor (lib/feed/engine.ts, lib/index,
+ * lib/coach/contributors.ts) all expect synchronous, zero-argument
+ * callbacks — an app-wide assumption that predates any real database
+ * (every engine's contributor has the same shape, not just Connection
+ * Hub's). Now that connection reads are async Postgres queries, this
+ * in-memory cache — refreshed after every mutating engine.ts operation —
+ * is what lets those three contributor functions keep their required
+ * synchronous signature without a cross-cutting rewrite of the entire
+ * contributor system. It only ever reflects the state as of the last
+ * mutation made through this module, and (per
+ * getAllStoredConnectionsUnscoped's own doc comment) is unscoped across
+ * all users, matching this app's pre-existing single-tenant assumption in
+ * every other engine's contributors — properly scoping Feed/Index/Coach
+ * generation per organization is a larger, separate effort.
+ */
+let connectionRecordsCache: ConnectionRecord[] = [];
+
+async function refreshConnectionCache(): Promise<void> {
+  connectionRecordsCache = await getAllConnectionRecordsUnscoped();
+}
+
+// Best-effort warm at module load so the cache isn't empty before the
+// first mutation — failures here (e.g. DB unreachable at cold start)
+// are swallowed since contributors degrade gracefully to an empty list.
+void refreshConnectionCache().catch(() => undefined);
 
 const PROVIDER_NAMES: Record<ProviderId, string> = { google: "Gmail", microsoft: "Outlook", yahoo: "Yahoo Mail" };
 
@@ -173,7 +212,7 @@ function lastLifecycleEvent(record: ConnectionRecord): ConnectionHistoryEvent | 
 function buildConnectionFeedItems(): FeedItem[] {
   const items: FeedItem[] = [];
 
-  for (const record of getAllConnectionRecords()) {
+  for (const record of connectionRecordsCache) {
     const event = lastLifecycleEvent(record);
     if (!event) continue;
     const label = PROVIDER_NAMES[record.provider];
@@ -205,7 +244,7 @@ function buildConnectionFeedItems(): FeedItem[] {
 }
 
 function buildConnectionIndexObjects(): IndexedObject[] {
-  return getAllConnectionRecords().map((record) => {
+  return connectionRecordsCache.map((record) => {
     const label = PROVIDER_NAMES[record.provider];
     return {
       id: `connection:${record.id}`,
@@ -243,7 +282,7 @@ function buildConnectionIndexObjects(): IndexedObject[] {
  * correct enhancement, but that crosses into shared orchestrator code
  * this milestone deliberately leaves untouched. */
 function getCoachSummary(): CoachImportSummaryContribution | null {
-  const all = getAllConnectionRecords();
+  const all = connectionRecordsCache;
   if (all.length === 0) return null;
 
   const healthy = all.filter((r) => r.health.status === "healthy").length;

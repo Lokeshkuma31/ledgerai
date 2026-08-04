@@ -4,88 +4,61 @@
  * ConnectionRecord projection that is the only thing anything outside
  * lib/connections/ is ever allowed to read.
  *
- * This app has no database; every other framework here persists to
- * `localStorage` as a stand-in for one, but tokens can never touch
- * client-side storage (the spec's "never expose to the UI" is
- * non-negotiable), so this registry persists instead to a JSON file under
- * a server-only, gitignored directory via Node's `fs` module — reachable
- * only from Route Handlers, Server Actions, and other lib/connections/
- * modules, never from a "use client" file (which couldn't import
- * `node:fs` in the first place; Next.js refuses that at build time).
- * A real production deployment would swap this file-backed store for a
- * proper encrypted-at-rest database table — nothing above this module's
- * function signatures would need to change.
+ * Persists to Postgres via repositories/connection-repository.ts — the
+ * production successor to this module's original file-backed JSON store
+ * (`.connections-data/store.json`), migrated per
+ * scripts/migrate-connections-store.ts. Every function below keeps the
+ * same name and argument shape it always had; the only change forced by
+ * a real database is that reads/writes are now async, and
+ * account-lookup/listing functions take a `userId` to scope their query
+ * now that connections belong to real Better Auth users instead of an
+ * implicit single local user.
  */
-import fs from "node:fs";
-import path from "node:path";
+import * as connectionRepository from "@/repositories/connection-repository";
 import type { ConnectionHealth, ConnectionHistoryEvent, ConnectionRecord, ProviderId, StoredConnection } from "@/lib/connections/types";
 
-const DATA_DIR = path.join(process.cwd(), ".connections-data");
-const STORE_FILE = path.join(DATA_DIR, "store.json");
 const MAX_HISTORY = 50;
-
-function readStore(): StoredConnection[] {
-  try {
-    const raw = fs.readFileSync(STORE_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as StoredConnection[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStore(records: StoredConnection[]): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STORE_FILE, JSON.stringify(records, null, 2), "utf8");
-}
 
 // --- internal (server-only) reads/writes — carry token material ------------
 
-export function getStoredConnection(id: string): StoredConnection | undefined {
-  return readStore().find((r) => r.id === id);
+export async function getStoredConnection(id: string): Promise<StoredConnection | undefined> {
+  return connectionRepository.getStoredConnection(id);
 }
 
-export function findStoredConnectionByAccount(provider: ProviderId, providerAccountId: string): StoredConnection | undefined {
-  return readStore().find((r) => r.provider === provider && r.providerAccountId === providerAccountId);
+export async function findStoredConnectionByAccount(userId: string, provider: ProviderId, providerAccountId: string): Promise<StoredConnection | undefined> {
+  return connectionRepository.findStoredConnectionByAccount(userId, provider, providerAccountId);
 }
 
-export function getAllStoredConnections(): StoredConnection[] {
-  return readStore();
+export async function getAllStoredConnections(userId: string): Promise<StoredConnection[]> {
+  return connectionRepository.getAllStoredConnections(userId);
 }
 
-export function upsertStoredConnection(record: StoredConnection): void {
-  const all = readStore();
-  const index = all.findIndex((r) => r.id === record.id);
-  if (index === -1) {
-    writeStore([...all, record]);
-  } else {
-    all[index] = record;
-    writeStore(all);
-  }
+export async function upsertStoredConnection(record: StoredConnection): Promise<void> {
+  return connectionRepository.upsertStoredConnection(record);
 }
 
-export function deleteStoredConnection(id: string): void {
-  writeStore(readStore().filter((r) => r.id !== id));
+export async function deleteStoredConnection(id: string): Promise<void> {
+  return connectionRepository.deleteStoredConnection(id);
 }
 
-export function appendHistory(id: string, event: ConnectionHistoryEvent): StoredConnection | undefined {
-  const record = getStoredConnection(id);
+export async function appendHistory(id: string, event: ConnectionHistoryEvent): Promise<StoredConnection | undefined> {
+  const record = await getStoredConnection(id);
   if (!record) return undefined;
   const updated: StoredConnection = { ...record, history: [...record.history, event].slice(-MAX_HISTORY) };
-  upsertStoredConnection(updated);
+  await upsertStoredConnection(updated);
   return updated;
 }
 
-export function recordHealth(id: string, health: ConnectionHealth): StoredConnection | undefined {
-  const record = getStoredConnection(id);
+export async function recordHealth(id: string, health: ConnectionHealth): Promise<StoredConnection | undefined> {
+  const record = await getStoredConnection(id);
   if (!record) return undefined;
   const updated: StoredConnection = { ...record, health };
-  upsertStoredConnection(updated);
+  await upsertStoredConnection(updated);
   return updated;
 }
 
-export function clearConnectionRegistry(): void {
-  writeStore([]);
+export async function clearConnectionRegistry(): Promise<void> {
+  return connectionRepository.clearConnectionRegistry();
 }
 
 // --- public (UI-safe) reads — never carry token material --------------------
@@ -93,15 +66,26 @@ export function clearConnectionRegistry(): void {
 /** The only place a StoredConnection's `tokens` field is dropped —
  * everything reachable from a Client Component goes through this. */
 export function toConnectionRecord(stored: StoredConnection): ConnectionRecord {
-  const { tokens, ...rest } = stored;
+  const { tokens, userId, ...rest } = stored;
+  void userId; // dropped deliberately — see the interface doc comment above
   return { ...rest, scopes: tokens?.scopes ?? [], tokenExpiresAt: tokens?.expiresAt ?? null };
 }
 
-export function getAllConnectionRecords(): ConnectionRecord[] {
-  return readStore().map(toConnectionRecord);
+export async function getAllConnectionRecords(userId: string): Promise<ConnectionRecord[]> {
+  const stored = await getAllStoredConnections(userId);
+  return stored.map(toConnectionRecord);
 }
 
-export function getConnectionRecord(id: string): ConnectionRecord | undefined {
-  const stored = getStoredConnection(id);
+export async function getConnectionRecord(id: string): Promise<ConnectionRecord | undefined> {
+  const stored = await getStoredConnection(id);
   return stored ? toConnectionRecord(stored) : undefined;
+}
+
+/** Unscoped read used only by engine.ts's Feed/Index/Coach contributors —
+ * see repositories/connection-repository.ts's getAllStoredConnectionsUnscoped
+ * for why (a pre-existing, app-wide synchronous-contributor limitation,
+ * not specific to Connection Hub). */
+export async function getAllConnectionRecordsUnscoped(): Promise<ConnectionRecord[]> {
+  const stored = await connectionRepository.getAllStoredConnectionsUnscoped();
+  return stored.map(toConnectionRecord);
 }

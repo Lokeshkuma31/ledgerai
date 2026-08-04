@@ -1,0 +1,1305 @@
+// LedgerAI production schema.
+// See plan: "LedgerAI — Production Backend Architecture" (§2, §3) for the
+// design rationale behind these models.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Core
+// ============================================================
+
+model Organization {
+  id         String    @id @default(cuid())
+  name       String
+  isPersonal Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  memberships             Membership[]
+  transactions            Transaction[]
+  merchants               Merchant[]
+  budgets                 Budget[]
+  goals                   Goal[]
+  recurringTransactions   RecurringTransaction[]
+  financialEvents         FinancialEvent[]
+  documents               Document[]
+  forecastSnapshots       ForecastSnapshot[]
+  recommendations         Recommendation[]
+  aiConversations         AIConversation[]
+  aiMemoryEntries         AIMemoryEntry[]
+  workflowDefinitions     WorkflowDefinition[]
+  workflowRuns            WorkflowRun[]
+  feedItems               FeedItem[]
+  notificationCandidates  NotificationCandidate[]
+  notificationPreferences NotificationPreferences?
+  notificationCooldowns   NotificationCooldown[]
+  syncJobs                SyncJob[]
+  bankConnectorStates     BankConnectorState[]
+  bankAccounts            BankAccount[]
+  emailProviderStates     EmailProviderState[]
+  emailRecords            EmailRecord[]
+  briefingDeliveryLogs    BriefingDeliveryLog[]
+  auditLogs               AuditLog[]
+  featureFlagOverrides    FeatureFlagOverride[]
+
+  @@map("organizations")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole @default(OWNER)
+  createdAt      DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model PluginRegistryEntry {
+  id           String   @id
+  name         String
+  version      String
+  author       String
+  capabilities String[]
+  dependencies String[]
+  enabled      Boolean  @default(true)
+  status       String
+  health       Json
+  installedAt  DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("plugin_registry_entries")
+}
+
+model FeatureFlag {
+  key         String   @id
+  description String
+  defaultOn   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  overrides FeatureFlagOverride[]
+
+  @@map("feature_flags")
+}
+
+model FeatureFlagOverride {
+  id             String  @id @default(cuid())
+  flagKey        String
+  organizationId String
+  enabled        Boolean
+
+  flag         FeatureFlag  @relation(fields: [flagKey], references: [key], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([flagKey, organizationId])
+  @@map("feature_flag_overrides")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entityType     String
+  entityId       String
+  before         Json?
+  after          Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// Auth (Better Auth-managed)
+// ============================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String?
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships   Membership[]
+  oauthAccounts OAuthAccount[]
+  sessions      Session[]
+  preferences   UserPreferences?
+  connections   Connection[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// Better Auth-managed (via prismaAdapter, modelName "oAuthAccount") — both
+// social sign-in accounts AND email/password credentials (provider
+// "credential", password holds the hash) live in this one table, per
+// Better Auth's account schema convention.
+model OAuthAccount {
+  id                    String    @id @default(cuid())
+  userId                String
+  provider              String
+  providerAccountId     String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+// Better Auth-managed — email verification tokens, password resets, magic
+// links, OTP, etc.
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model UserPreferences {
+  userId               String   @id
+  theme                String   @default("system")
+  notificationChannels String[]
+  briefingSchedule     Json?
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// ============================================================
+// Connections (data-source OAuth — distinct from Better Auth identity)
+// ============================================================
+
+enum ConnectionProvider {
+  GOOGLE
+  MICROSOFT
+  YAHOO
+}
+
+// Mirrors lib/connections/types.ts's CONNECTION_STATUSES verbatim, minus
+// "not-connected" (that value is never persisted — it's the UI's own
+// fallback for a provider with no Connection row at all yet).
+enum ConnectionStatus {
+  CONNECTING
+  CONNECTED
+  EXPIRED
+  DISCONNECTED
+  AUTHENTICATION_FAILED
+  PERMISSION_REVOKED
+}
+
+model Connection {
+  id                String             @id @default(cuid())
+  userId            String
+  provider          ConnectionProvider
+  providerAccountId String
+  displayName       String
+  email             String
+  status            ConnectionStatus   @default(CONNECTED)
+  connectedAt       DateTime           @default(now())
+  lastValidated     DateTime?
+  lastActivity      DateTime?
+  // The full TokenSet (accessToken/refreshToken EncryptedPayloads,
+  // expiresAt, tokenType, scopes) as one JSON blob — mirrors exactly what
+  // the file-backed store already serializes today. Null after disconnect
+  // (tokens are wiped, not just flagged). tokenExpiresAt/scopes below are
+  // denormalized copies for queries that shouldn't need to parse JSON.
+  tokens            Json?
+  tokenExpiresAt    DateTime?
+  scopes            String[]
+  health            Json
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  user     User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history  ConnectionHistoryEvent[]
+  syncJobs SyncJob[]
+
+  // Scoped per-user, not global — two different app users legitimately
+  // connecting the same external Google/Microsoft/Yahoo account is a real
+  // case (unlike OAuthAccount's identity link above, which must be
+  // globally 1:1). This only prevents one user from connecting the same
+  // external account twice.
+  @@unique([userId, provider, providerAccountId])
+  @@index([userId])
+  @@map("connections")
+}
+
+model ConnectionHistoryEvent {
+  id           String   @id @default(cuid())
+  connectionId String
+  type         String
+  detail       Json
+  createdAt    DateTime @default(now())
+
+  connection Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt])
+  @@map("connection_history_events")
+}
+
+// The provider's category — email/bank/sms/document/other, matching
+// lib/sync/types.ts's SyncProviderCategory. Distinct from SyncRunType
+// below (which is what the app's own SyncJobType actually means: the
+// *kind* of run — initial/incremental/manual/etc — a naming collision
+// this enum's original name invited).
+enum SyncProviderCategory {
+  EMAIL_IMPORT
+  BANK_SYNC
+  SMS_IMPORT
+  ACCOUNT_AGGREGATOR
+  DOCUMENT
+  OTHER
+}
+
+// Matches SyncJobType in lib/sync/types.ts exactly.
+enum SyncRunType {
+  INITIAL
+  INCREMENTAL
+  MANUAL
+  SCHEDULED
+  RESUME
+  RETRY
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  PARTIAL
+  CANCELLED
+}
+
+model SyncJob {
+  id               String               @id @default(cuid())
+  connectionId     String?
+  organizationId   String
+  // SyncProvider.id (lib/sync/types.ts) — a free-text provider identity,
+  // not every provider is Connection Hub-backed (bank/SMS/document
+  // providers are separate plugin registrations with no Connection row
+  // today; connectionId stays available for the ones that are).
+  providerId       String
+  plugin           String
+  providerCategory SyncProviderCategory
+  runType          SyncRunType
+  status           SyncJobStatus        @default(PENDING)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  itemsDiscovered  Int                  @default(0)
+  itemsImported    Int                  @default(0)
+  itemsSkipped     Int                  @default(0)
+  duplicates       Int                  @default(0)
+  errors           Json[]               @default([])
+  warnings         Json[]               @default([])
+  retryCount       Int                  @default(0)
+  lastCheckpoint   Json?
+  metadata         Json?
+  createdAt        DateTime             @default(now())
+
+  connection   Connection?        @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  history      SyncHistoryEvent[]
+
+  @@index([organizationId, createdAt])
+  @@index([connectionId])
+  @@index([organizationId, providerId])
+  @@map("sync_jobs")
+}
+
+model SyncHistoryEvent {
+  id        String   @id @default(cuid())
+  syncJobId String
+  event     String
+  detail    Json
+  createdAt DateTime @default(now())
+
+  syncJob SyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+
+  @@index([syncJobId, createdAt])
+  @@map("sync_history_events")
+}
+
+// Bank Connector Framework — a distinct concept from Connection above
+// (that's Better Auth-adjacent OAuth data-source connections for Gmail/
+// Outlook/Yahoo; bank connectors are separate demo/plugin registrations
+// with their own id space, no OAuth flow, and no existing Connection
+// row). connectorId is free text (matches lib/banks/connector.ts's
+// BankConnector.id), not an FK — connectors are registered in-memory by
+// lib/banks/providers.ts every cold start, not DB rows themselves.
+model BankConnectorState {
+  id             String                @id @default(cuid())
+  organizationId String
+  connectorId    String
+  enabled        Boolean               @default(true)
+  // ConnectorHealth ({status, message, checkedAt}) as JSON — mirrors
+  // Connection.health's own choice above rather than adding another
+  // narrow enum.
+  lastHealth     Json?
+  lastConnection BankConnectionStatus?
+  lastSyncAt     DateTime?
+  installedAt    DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, connectorId])
+  @@map("bank_connector_states")
+}
+
+// Matches ConnectionStatus in lib/banks/types.ts exactly (named
+// BankConnectionStatus here to avoid colliding with the unrelated
+// ConnectionStatus enum above, which belongs to Connection/Connection Hub).
+enum BankConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  AUTHENTICATING
+  REAUTHENTICATION_REQUIRED
+  ERROR
+}
+
+// Matches BankAccountType in lib/banks/types.ts exactly.
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  LOAN
+  INVESTMENT
+  WALLET
+  BUSINESS
+  CASH
+}
+
+// Matches AccountStatus in lib/banks/types.ts exactly.
+enum BankAccountStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+  ERROR
+}
+
+model BankAccount {
+  id               String            @id
+  organizationId   String
+  connectorId      String
+  institution      String
+  accountName      String
+  accountType      BankAccountType
+  maskedNumber     String
+  currency         String
+  balance          Decimal           @db.Decimal(14, 2)
+  availableBalance Decimal           @db.Decimal(14, 2)
+  lastSynced       DateTime?
+  status           BankAccountStatus
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, connectorId])
+  @@map("bank_accounts")
+}
+
+// Email Intelligence Framework — a distinct concept from EmailMetadata
+// below (that's a thin document-linkage stub for the Document
+// Intelligence pipeline) and from Connection above (Connection Hub's
+// OAuth identity, not this framework's own provider registrations).
+// Mirrors the Bank Connector Framework's split exactly: live provider
+// instances stay in-memory in lib/email/registry.ts, only persisted
+// state/records live here.
+model EmailProviderState {
+  id             String                         @id @default(cuid())
+  organizationId String
+  providerId     String
+  enabled        Boolean                        @default(true)
+  // EmailProviderHealth ({status, message, checkedAt}) as JSON — mirrors
+  // BankConnectorState.lastHealth's own choice.
+  lastHealth     Json?
+  lastConnection EmailProviderConnectionStatus?
+  lastSyncAt     DateTime?
+  installedAt    DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, providerId])
+  @@map("email_provider_states")
+}
+
+// Matches EmailConnectionStatus in lib/email/types.ts exactly (named
+// EmailProviderConnectionStatus here to avoid colliding with
+// EmailMetadata's unrelated neighborhood).
+enum EmailProviderConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  AUTHENTICATING
+  ERROR
+}
+
+// Matches EMAIL_TYPES in lib/email/types.ts exactly.
+enum EmailIntelligenceType {
+  RECEIPT
+  INVOICE
+  SUBSCRIPTION_RENEWAL
+  REFUND
+  SALARY_SLIP
+  UTILITY_BILL
+  CREDIT_CARD_STATEMENT
+  BANK_STATEMENT
+  FLIGHT_BOOKING
+  HOTEL_BOOKING
+  INSURANCE
+  LOAN
+  INVESTMENT_REPORT
+  TAX_DOCUMENT
+  UNKNOWN
+}
+
+// Matches EMAIL_RECORD_STATUSES in lib/email/types.ts exactly.
+enum EmailRecordStatus {
+  PROCESSED
+  DUPLICATE
+  IMPORTED
+  SKIPPED
+  REJECTED
+  FAILED
+}
+
+// The Email Intelligence Framework's processed-email record (classification
+// + extraction + duplicate-detection + import lineage) — lib/email/
+// registry.ts's successor for everything except live provider instances
+// and import-run history (the latter reuses SyncJob/SyncHistoryEvent via
+// repositories/sync-job-repository.ts, category EMAIL_IMPORT, rather than
+// a third near-duplicate history table).
+model EmailRecord {
+  id                            String                @id
+  organizationId                String
+  providerId                    String
+  externalId                    String
+  subject                       String
+  sender                        String
+  receivedAt                    DateTime
+  emailType                     EmailIntelligenceType
+  classificationConfidence      Float
+  matchedRules                  String[]
+  // ExtractedEmailFields (merchant/amount/currency/invoiceNumber/
+  // referenceNumber/dueDate/statementPeriod/transactions/attachments/body/
+  // confidence) as one JSON blob — a nested extraction-result shape,
+  // stored the same way WorkflowDefinition.steps and ForecastSnapshot.payload
+  // already store their own engine-output shapes in this schema.
+  fields                        Json
+  // EmailValidationError[] ({code, field?, message}) as JSON.
+  validationErrors              Json[]                @default([])
+  isDuplicate                   Boolean               @default(false)
+  duplicateOfId                 String?
+  status                        EmailRecordStatus
+  linkedTransactionIds          String[]
+  matchedExistingTransactionIds String[]
+  processedAt                   DateTime
+  importedAt                    DateTime?
+  updatedAt                     DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, providerId, externalId])
+  @@index([organizationId, status])
+  @@map("email_records")
+}
+
+// ============================================================
+// Financial data
+// ============================================================
+
+model Category {
+  id    String @id @default(cuid())
+  key   String @unique
+  label String
+
+  transactionsAsAi   Transaction[] @relation("AiCategory")
+  transactionsAsUser Transaction[] @relation("UserCategory")
+  budgets            Budget[]
+
+  @@map("categories")
+}
+
+enum PaymentMethod {
+  UPI
+  DEBIT_CARD
+  CREDIT_CARD
+  CASH
+  NET_BANKING
+}
+
+enum ClassificationSource {
+  MEMORY
+  CLASSIFIER
+}
+
+model Transaction {
+  id                   String                   @id @default(cuid())
+  organizationId       String
+  amount               Decimal                  @db.Decimal(14, 2)
+  note                 String
+  paymentMethod        PaymentMethod
+  aiCategoryId         String?
+  confidence           Float?
+  classificationSource ClassificationSource?
+  userCategoryId       String?
+  reviewed             Boolean                  @default(false)
+  date                 DateTime                 @db.Date
+  merchantId           String?
+  merchantName         String?
+  merchantConfidence   Float?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  deletedAt            DateTime?
+  searchVector         Unsupported("tsvector")?
+
+  organization   Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  merchant       Merchant?                         @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  aiCategory     Category?                         @relation("AiCategory", fields: [aiCategoryId], references: [id], onDelete: SetNull)
+  userCategory   Category?                         @relation("UserCategory", fields: [userCategoryId], references: [id], onDelete: SetNull)
+  sources        TransactionSource[]
+  documentLinks  DocumentTransaction[]
+  recurringLinks RecurringTransactionTransaction[]
+
+  @@index([organizationId, date])
+  @@index([organizationId, reviewed])
+  @@index([merchantId])
+  @@map("transactions")
+}
+
+model TransactionSource {
+  id            String  @id @default(cuid())
+  transactionId String
+  kind          String
+  sourceId      String?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("transaction_sources")
+}
+
+model Merchant {
+  id               String                   @id @default(cuid())
+  organizationId   String
+  canonicalName    String
+  categoryHint     String?
+  firstSeen        DateTime
+  lastSeen         DateTime
+  transactionCount Int                      @default(0)
+  confidence       Float
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  deletedAt        DateTime?
+  searchVector     Unsupported("tsvector")?
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  aliases      MerchantAlias[]
+  profile      MerchantProfile?
+  transactions Transaction[]
+  recurring    RecurringTransaction[]
+
+  @@index([organizationId, canonicalName])
+  @@map("merchants")
+}
+
+model MerchantAlias {
+  id         String @id @default(cuid())
+  merchantId String
+  alias      String
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, alias])
+  @@map("merchant_aliases")
+}
+
+model MerchantProfile {
+  merchantId          String   @id
+  industry            String
+  merchantType        String
+  defaultCategory     String
+  subcategories       String[]
+  tags                String[]
+  country             String?
+  isOnline            Boolean  @default(false)
+  isRecurringFriendly Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("merchant_profiles")
+}
+
+// Matches RECURRING_FREQUENCIES in types/recurring.ts exactly.
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  UNKNOWN
+}
+
+// Matches RECURRING_STATUSES in types/recurring.ts exactly.
+enum RecurringStatus {
+  ACTIVE
+  UPCOMING
+  MISSED
+  PAUSED
+  STOPPED
+}
+
+model RecurringTransaction {
+  id                     String             @id @default(cuid())
+  organizationId         String
+  merchantId             String?
+  merchantName           String?
+  title                  String
+  // Free-text display category (e.g. "Subscriptions"), not the fixed
+  // 11-value Category enum — matches RecurringTransaction.category's plain
+  // `string` type, so no categoryId FK here.
+  category               String
+  frequency              RecurringFrequency
+  averageAmount          Decimal            @db.Decimal(14, 2)
+  minAmount              Decimal            @db.Decimal(14, 2)
+  maxAmount              Decimal            @db.Decimal(14, 2)
+  lastAmount             Decimal            @db.Decimal(14, 2)
+  lastOccurrence         DateTime           @db.Date
+  nextExpectedOccurrence DateTime?          @db.Date
+  daysRemaining          Int?
+  confidence             Float
+  transactionCount       Int                @default(0)
+  isSubscription         Boolean
+  isIncome               Boolean
+  isExpense              Boolean
+  status                 RecurringStatus
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  merchant     Merchant?                         @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  relatedTx    RecurringTransactionTransaction[]
+  overrides    RecurringOverride[]
+
+  @@index([organizationId, status])
+  @@map("recurring_transactions")
+}
+
+model RecurringTransactionTransaction {
+  recurringId   String
+  transactionId String
+
+  recurring   RecurringTransaction @relation(fields: [recurringId], references: [id], onDelete: Cascade)
+  transaction Transaction          @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@id([recurringId, transactionId])
+  @@map("recurring_transaction_transactions")
+}
+
+model RecurringOverride {
+  id          String   @id @default(cuid())
+  recurringId String
+  field       String
+  value       Json
+  createdAt   DateTime @default(now())
+
+  recurring RecurringTransaction @relation(fields: [recurringId], references: [id], onDelete: Cascade)
+
+  @@index([recurringId])
+  @@map("recurring_overrides")
+}
+
+model Budget {
+  id             String    @id @default(cuid())
+  organizationId String
+  categoryId     String
+  monthlyLimit   Decimal   @db.Decimal(14, 2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, categoryId])
+  @@map("budgets")
+}
+
+// Matches GOAL_STATUSES in types/goal.ts exactly.
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+model Goal {
+  id             String     @id @default(cuid())
+  organizationId String
+  name           String
+  targetAmount   Decimal    @db.Decimal(14, 2)
+  currentAmount  Decimal    @db.Decimal(14, 2)
+  targetDate     DateTime   @db.Date
+  icon           String
+  color          String
+  status         GoalStatus
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("goals")
+}
+
+model FinancialEvent {
+  id               String   @id @default(cuid())
+  organizationId   String
+  type             String
+  severity         String
+  relatedObjectIds String[]
+  payload          Json
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("financial_events")
+}
+
+// ============================================================
+// Documents
+// ============================================================
+
+enum DocumentType {
+  RECEIPT
+  INVOICE
+  BANK_STATEMENT
+  CREDIT_CARD_STATEMENT
+  UTILITY_BILL
+  SALARY_SLIP
+  INSURANCE_RECEIPT
+  INVESTMENT_STATEMENT
+  LOAN_STATEMENT
+  UNKNOWN
+}
+
+enum DocumentStatus {
+  PROCESSED
+  DUPLICATE
+  IMPORTED
+  SKIPPED
+  REJECTED
+  FAILED
+}
+
+model Document {
+  id                       String                   @id @default(cuid())
+  organizationId           String
+  fileName                 String
+  mimeType                 String
+  sizeBytes                Int
+  // Nullable: only documents that actually went through a real upload (see
+  // app/api/documents/upload/route.ts) have an R2 object — documents
+  // sourced from email attachments or the mock-fixture pipeline don't.
+  r2Key                    String?
+  uploadedAt               DateTime                 @default(now())
+  documentType             DocumentType
+  classificationConfidence Float
+  matchedRules             String[]
+  parserUsed               DocumentType
+  extractionConfidence     Float
+  fields                   Json
+  validationErrors         Json[]                   @default([])
+  isDuplicate              Boolean                  @default(false)
+  duplicateOfId            String?
+  status                   DocumentStatus
+  processedAt              DateTime?
+  importedAt               DateTime?
+  deletedAt                DateTime?
+  searchVector             Unsupported("tsvector")?
+
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  duplicateOf    Document?             @relation("DocumentDuplicate", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicatesOfMe Document[]            @relation("DocumentDuplicate")
+  attachments    DocumentAttachment[]
+  emailMetadata  EmailMetadata?
+  linkedTx       DocumentTransaction[]
+
+  @@index([organizationId, status])
+  @@map("documents")
+}
+
+model DocumentAttachment {
+  id         String @id @default(cuid())
+  documentId String
+  r2Key      String
+  mimeType   String
+  sizeBytes  Int
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("document_attachments")
+}
+
+model EmailMetadata {
+  id           String   @id @default(cuid())
+  documentId   String?  @unique
+  connectionId String?
+  messageId    String
+  subject      String
+  fromAddress  String
+  receivedAt   DateTime
+
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, messageId])
+  @@map("email_metadata")
+}
+
+model DocumentTransaction {
+  documentId    String
+  transactionId String
+
+  document    Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, transactionId])
+  @@map("document_transactions")
+}
+
+// ============================================================
+// Intelligence
+// ============================================================
+
+model ForecastSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  generatedAt    DateTime @default(now())
+  payload        Json
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, generatedAt])
+  @@index([organizationId, generatedAt])
+  @@map("forecast_snapshots")
+}
+
+enum RecommendationStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+  EXPIRED
+}
+
+// Matches RecommendationPriority in types/recommendation.ts exactly.
+enum RecommendationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Matches RecommendationCategory in types/recommendation.ts exactly.
+enum RecommendationCategory {
+  BUDGET
+  SAVINGS
+  SUBSCRIPTIONS
+  SPENDING
+  INCOME
+  HABITS
+  FORECAST
+  GENERAL
+}
+
+model Recommendation {
+  id               String                   @id @default(cuid())
+  organizationId   String
+  title            String
+  description      String
+  reason           String
+  action           String
+  priority         RecommendationPriority
+  category         RecommendationCategory
+  status           RecommendationStatus     @default(PENDING)
+  relatedObjectIds String[]
+  // Reserved for a future LLM-scored recommendation path — the current
+  // deterministic rule engine (lib/decision/engine.ts) doesn't produce one.
+  confidence       Float?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  searchVector     Unsupported("tsvector")?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("recommendations")
+}
+
+model AIConversation {
+  id             String   @id @default(cuid())
+  organizationId String
+  title          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     AIMessage[]
+
+  @@index([organizationId])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+model AIMemoryEntry {
+  id             String   @id @default(cuid())
+  organizationId String
+  key            String
+  value          Json
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@map("ai_memory_entries")
+}
+
+// Search Metadata: no separate IndexedObject table — generated tsvector
+// columns + GIN indexes live directly on Transaction/Merchant/Document/
+// FeedItem/Recommendation (added via a raw-SQL follow-up migration, since
+// Prisma's schema language can't express `GENERATED ALWAYS AS (...) STORED`).
+
+// ============================================================
+// Operations
+// ============================================================
+
+enum WorkflowStatus {
+  ENABLED
+  DISABLED
+}
+
+model WorkflowDefinition {
+  id             String         @id @default(cuid())
+  // Deterministic key (e.g. "workflow:budget-exceeded"), unique per
+  // organization — NOT the primary key, since the same built-in workflow
+  // key is seeded into every organization and a global-uniqueness `id`
+  // would let only one organization in the system ever own it.
+  key            String
+  organizationId String
+  name           String
+  description    String
+  trigger        String
+  steps          Json
+  status         WorkflowStatus @default(ENABLED)
+  priority       Int
+  lastRunSummary Json?
+  metadata       Json?
+  version        Int            @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         WorkflowRun[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId, trigger])
+  @@map("workflow_definitions")
+}
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+model WorkflowRun {
+  id              String            @id @default(cuid())
+  workflowId      String
+  organizationId  String
+  trigger         String
+  status          WorkflowRunStatus
+  startedAt       DateTime
+  completedAt     DateTime?
+  durationMs      Int?
+  successfulSteps Int               @default(0)
+  failedSteps     Int               @default(0)
+  retryCount      Int               @default(0)
+  context         Json?
+  inngestEventId  String?           @unique
+
+  workflow     WorkflowDefinition   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        WorkflowStepResult[]
+
+  @@index([organizationId, startedAt])
+  @@map("workflow_runs")
+}
+
+model WorkflowStepResult {
+  id            String    @id @default(cuid())
+  workflowRunId String
+  engine        String
+  action        String
+  input         Json?
+  output        Json?
+  status        String
+  startedAt     DateTime?
+  completedAt   DateTime?
+  durationMs    Int?
+  error         String?
+  retryCount    Int       @default(0)
+
+  run WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  @@index([workflowRunId])
+  @@map("workflow_step_results")
+}
+
+model FeedItem {
+  id               String                   @id @default(cuid())
+  // Deterministic composite key (e.g. "feed:budget:warning:${statusId}"),
+  // unique per organization — see WorkflowDefinition.key for why this can't
+  // be the global primary key.
+  key              String
+  organizationId   String
+  type             String
+  title            String
+  summary          String
+  priority         Int
+  severity         String
+  sourceEngine     String
+  relatedObjectIds String[]
+  explanationId    String?
+  confidence       Float
+  expiresAt        DateTime?
+  isRead           Boolean                  @default(false)
+  isPinned         Boolean                  @default(false)
+  isDismissed      Boolean                  @default(false)
+  metadata         Json?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  searchVector     Unsupported("tsvector")?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId, isDismissed, priority])
+  @@map("feed_items")
+}
+
+// Matches POLICY_DECISIONS in types/policy.ts exactly.
+enum PolicyDecision {
+  NOTIFY_IMMEDIATELY
+  SCHEDULE_LATER
+  INCLUDE_IN_DAILY_BRIEFING
+  INCLUDE_IN_WEEKLY_SUMMARY
+  SILENT
+  DISMISS
+  EXPIRED
+}
+
+model NotificationCandidate {
+  id                  String         @id @default(cuid())
+  organizationId      String
+  title               String
+  summary             String
+  priority            Int
+  severity            String
+  reason              String
+  sourceEngine        String
+  relatedObjectIds    String[]
+  recommendedChannels String[]
+  recommendedTime     DateTime?
+  expiresAt           DateTime?
+  cooldownKey         String
+  confidence          Float
+  policyDecision      PolicyDecision
+  metadata            Json?
+  createdAt           DateTime       @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   NotificationDelivery[]
+
+  @@index([organizationId, cooldownKey])
+  @@map("notification_candidates")
+}
+
+enum NotificationChannel {
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SUPPRESSED
+}
+
+model NotificationDelivery {
+  id          String              @id @default(cuid())
+  candidateId String
+  channel     NotificationChannel
+  status      DeliveryStatus      @default(PENDING)
+  sentAt      DateTime?
+  error       String?
+
+  candidate NotificationCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@map("notification_deliveries")
+}
+
+// A single persisted object per organization, not a collection — mirrors
+// types/policy.ts's own doc comment on NotificationPreferences ("mirrors
+// how Budgets or Coach cache use one record rather than a registry of
+// many"). Distinct from UserPreferences (Better Auth-adjacent, user-scoped,
+// a different field set entirely) — this is Policy's own domain object.
+model NotificationPreferences {
+  organizationId         String   @id
+  budgetAlerts           Boolean  @default(true)
+  forecastAlerts         Boolean  @default(true)
+  subscriptionAlerts     Boolean  @default(true)
+  achievements           Boolean  @default(true)
+  merchantInsights       Boolean  @default(true)
+  weeklyDigest           Boolean  @default(true)
+  monthlyDigest          Boolean  @default(true)
+  quietHoursEnabled      Boolean  @default(false)
+  quietHoursStart        String   @default("22:00")
+  quietHoursEnd          String   @default("07:00")
+  // NotificationChannel values as plain strings, matching
+  // NotificationCandidate.recommendedChannels' own choice — the app's
+  // NOTIFICATION_CHANNELS union is wider than (and independent of) the
+  // NotificationChannel enum above, which only exists for the
+  // not-yet-built NotificationDelivery.channel column.
+  preferredChannels      String[]
+  maxNotificationsPerDay Int      @default(10)
+  updatedAt              DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// lib/policy/cooldown.ts's successor — suppression state keyed by
+// cooldownKey (e.g. "budget:Food"), organization-scoped. A Redis TTL-based
+// store would fit this shape well too (see the migration plan §3), but
+// Postgres keeps this pass consistent with everything else migrated in
+// Tier C; revisit alongside the plan's later Redis-wiring phase.
+model NotificationCooldown {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  cooldownKey          String
+  lastFiredAt          DateTime
+  lastContentSignature String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, cooldownKey])
+  @@map("notification_cooldowns")
+}
+
+enum ScheduleType {
+  MORNING_BRIEFING
+  EVENING_BRIEFING
+  WEEKLY_SUMMARY
+  MONTHLY_SUMMARY
+}
+
+model BriefingDeliveryLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  scheduleType   ScheduleType
+  date           DateTime     @db.Date
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, scheduleType, date])
+  @@map("briefing_delivery_logs")
+}

@@ -1,6 +1,7 @@
 import ConnectionHub from "@/components/ConnectionHub";
 import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
 import { getConnections, getProviderDescriptors } from "@/lib/connections/engine";
+import { getCurrentUserId } from "@/lib/auth/session";
 
 export default async function ConnectionsPage({
   searchParams,
@@ -9,7 +10,8 @@ export default async function ConnectionsPage({
 }) {
   const banner = await searchParams;
   const descriptors = getProviderDescriptors();
-  const connections = getConnections();
+  const userId = await getCurrentUserId();
+  const connections = userId ? await getConnections(userId) : [];
 
   return (
     <div className="flex flex-col gap-8">

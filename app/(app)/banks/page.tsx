@@ -1,9 +1,11 @@
 import BankDashboard from "@/components/BankDashboard";
 import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
 import { getConnections } from "@/lib/connections/engine";
+import { getCurrentUserId } from "@/lib/auth/session";
 
-export default function BanksPage() {
-  const connections = getConnections();
+export default async function BanksPage() {
+  const userId = await getCurrentUserId();
+  const connections = userId ? await getConnections(userId) : [];
 
   return (
     <div className="flex flex-col gap-8">

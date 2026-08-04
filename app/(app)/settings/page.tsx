@@ -1,6 +1,7 @@
 import SettingsShell from "@/components/settings/SettingsShell";
 import { getAIProviderSummary } from "@/lib/ai/config";
 import { getConnections } from "@/lib/connections/engine";
+import { getCurrentUserId } from "@/lib/auth/session";
 
 export default async function SettingsPage({
   searchParams,
@@ -8,7 +9,8 @@ export default async function SettingsPage({
   searchParams: Promise<{ section?: string }>;
 }) {
   const { section } = await searchParams;
-  const connections = getConnections();
+  const userId = await getCurrentUserId();
+  const connections = userId ? await getConnections(userId) : [];
   const aiSummary = getAIProviderSummary();
 
   return (

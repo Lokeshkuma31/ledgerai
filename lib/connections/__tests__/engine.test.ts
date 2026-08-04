@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment node
+//
+// This suite is Postgres-backed via the Neon serverless driver, which uses
+// a real Node WebSocket connection — jsdom (this project's default test
+// environment) installs its own Event/WebSocket globals that conflict with
+// it, so this file overrides back to the plain Node environment.
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-process.env.CONNECTION_HUB_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
+process.env.CONNECTION_HUB_ENCRYPTION_KEY ||= Buffer.alloc(32, 9).toString("base64");
 process.env.GOOGLE_OAUTH_CLIENT_ID = "google-client-id";
 process.env.GOOGLE_OAUTH_CLIENT_SECRET = "google-client-secret";
 process.env.MICROSOFT_OAUTH_CLIENT_ID = "microsoft-client-id";
@@ -9,8 +15,29 @@ process.env.YAHOO_OAUTH_CLIENT_ID = "yahoo-client-id";
 process.env.YAHOO_OAUTH_CLIENT_SECRET = "yahoo-client-secret";
 
 import { completeConnection, disconnectConnection, getConnections, refreshConnection, startConnection } from "@/lib/connections/engine";
-import { clearConnectionRegistry, getStoredConnection } from "@/lib/connections/registry";
+import { getStoredConnection } from "@/lib/connections/registry";
+import { prisma } from "@/lib/db/prisma";
 import type { ProviderId } from "@/lib/connections/types";
+
+// This module is Postgres-backed (see repositories/connection-repository.ts)
+// rather than mocked, so these are integration tests against the real dev
+// database configured in .env.local — a real User row is required to
+// satisfy Connection.userId's foreign key.
+let testUserId: string;
+
+// Real network round-trips against Neon (incl. cold-start latency) make
+// this suite slower than the 5s default per-test timeout.
+vi.setConfig({ testTimeout: 20000 });
+
+beforeAll(async () => {
+  const user = await prisma.user.create({ data: { email: `connection-hub-test-${Date.now()}@ledgerai.local`, name: "Connection Hub Test" } });
+  testUserId = user.id;
+}, 20000);
+
+afterAll(async () => {
+  await prisma.user.delete({ where: { id: testUserId } }).catch(() => undefined);
+  await prisma.$disconnect();
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -49,12 +76,16 @@ async function connectProvider(provider: ProviderId, tokenBody: Record<string, u
     code: "auth-code",
     codeVerifier: start.codeVerifier,
     redirectUri: `https://app.example/api/connections/${provider}/callback`,
+    userId: testUserId,
   });
 }
 
 describe("Connection Hub engine", () => {
-  beforeEach(() => {
-    clearConnectionRegistry();
+  beforeEach(async () => {
+    // Scoped to this test's own user rather than clearConnectionRegistry()
+    // (which deletes every connection for every user) — this suite runs
+    // against the real dev database, not an isolated per-test store.
+    await prisma.connection.deleteMany({ where: { userId: testUserId } });
     vi.unstubAllGlobals();
   });
 
@@ -76,7 +107,7 @@ describe("Connection Hub engine", () => {
     expect(JSON.stringify(record)).not.toContain("g-rt-1");
 
     // The server-only stored record holds only encrypted ciphertext.
-    const stored = getStoredConnection(record.id)!;
+    const stored = (await getStoredConnection(record.id))!;
     expect(stored.tokens?.accessToken.ciphertext).toBeTruthy();
     expect(stored.tokens?.accessToken.ciphertext).not.toContain("g-at-1");
   });
@@ -128,7 +159,7 @@ describe("Connection Hub engine", () => {
     installFetchMock([{ match: (u) => u.includes("token"), response: () => jsonResponse({ error: "invalid_grant" }, 400) }]);
     await expect(refreshConnection(record.id)).rejects.toThrow();
 
-    const stored = getStoredConnection(record.id)!;
+    const stored = (await getStoredConnection(record.id))!;
     expect(stored.status).toBe("permission-revoked");
     expect(stored.health.status).toBe("permission-revoked");
   });
@@ -138,9 +169,15 @@ describe("Connection Hub engine", () => {
     const start = startConnection("google", "https://app.example/api/connections/google/callback");
 
     await expect(
-      completeConnection({ providerId: "google", code: "bad-code", codeVerifier: start.codeVerifier, redirectUri: "https://app.example/api/connections/google/callback" }),
+      completeConnection({
+        providerId: "google",
+        code: "bad-code",
+        codeVerifier: start.codeVerifier,
+        redirectUri: "https://app.example/api/connections/google/callback",
+        userId: testUserId,
+      }),
     ).rejects.toThrow();
-    expect(getConnections()).toHaveLength(0);
+    expect(await getConnections(testUserId)).toHaveLength(0);
   });
 
   it("Reconnect flow: completing a connection with existingConnectionId updates the same record in place", async () => {
@@ -163,11 +200,12 @@ describe("Connection Hub engine", () => {
       code: "auth-code-2",
       codeVerifier: start.codeVerifier,
       redirectUri: "https://app.example/api/connections/google/callback",
+      userId: testUserId,
       existingConnectionId: first.id,
     });
 
     expect(reconnected.id).toBe(first.id);
-    expect(getConnections()).toHaveLength(1);
+    expect(await getConnections(testUserId)).toHaveLength(1);
     expect(reconnected.history.at(-1)?.type).toBe("reconnected");
   });
 
@@ -183,7 +221,7 @@ describe("Connection Hub engine", () => {
 
     expect(disconnected?.status).toBe("disconnected");
     expect(disconnected?.health.status).toBe("disconnected");
-    const stored = getStoredConnection(record.id)!;
+    const stored = (await getStoredConnection(record.id))!;
     expect(stored.tokens).toBeNull();
   });
 });

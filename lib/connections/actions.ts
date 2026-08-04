@@ -32,7 +32,7 @@ export async function refreshConnectionAction(id: string): Promise<{ record?: Co
 }
 
 export async function renameConnectionAction(id: string, displayName: string): Promise<ConnectionRecord | undefined> {
-  const result = renameConnection(id, displayName);
+  const result = await renameConnection(id, displayName);
   revalidatePath("/connections");
   return result;
 }

@@ -7,10 +7,9 @@
  * set httpOnly + secure + sameSite=lax so it's inaccessible to page
  * JavaScript and never sent cross-site.
  *
- * This app has no user-account/login system (every framework here assumes
- * a single local user), so this is deliberately narrower than a general
- * "user session" — it exists only for the duration of one OAuth attempt
- * and is deleted the moment it's read.
+ * Deliberately narrower than a general "user session" (that's Better
+ * Auth's job now, via lib/auth/) — this one exists only for the duration
+ * of one OAuth attempt and is deleted the moment it's read.
  */
 import { cookies } from "next/headers";
 import type { ProviderId } from "@/lib/connections/types";

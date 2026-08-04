@@ -65,7 +65,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
   }
 
   async function refreshToken(connectionId: string): Promise<StoredConnection> {
-    const existing = getStoredConnection(connectionId);
+    const existing = await getStoredConnection(connectionId);
     if (!existing) throw new Error(`Connection "${connectionId}" not found.`);
     if (!existing.tokens?.refreshToken) throw new Error("No refresh token on file — reconnect required.");
 
@@ -92,7 +92,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
         lastActivity: now.toISOString(),
         history: pushHistory(existing.history, { type: "token-refreshed", at: now.toISOString(), message: "Access token refreshed." }),
       };
-      upsertStoredConnection(updated);
+      await upsertStoredConnection(updated);
       return updated;
     } catch (error) {
       const now = new Date().toISOString();
@@ -114,13 +114,13 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
           message: error instanceof Error ? error.message : "Token refresh failed.",
         }),
       };
-      upsertStoredConnection(updated);
+      await upsertStoredConnection(updated);
       throw error;
     }
   }
 
   async function validateConnection(connectionId: string): Promise<boolean> {
-    const existing = getStoredConnection(connectionId);
+    const existing = await getStoredConnection(connectionId);
     if (!existing?.tokens) return false;
     if (isExpired(existing.tokens.expiresAt)) return false;
     try {
@@ -159,7 +159,9 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
       const userInfoJson = await fetchUserInfo(config.endpoints.userInfoEndpoint, tokenResponse.accessToken);
       const { id: providerAccountId, email, name } = config.mapUserInfo(userInfoJson);
 
-      const existing = input.existingConnectionId ? getStoredConnection(input.existingConnectionId) : findStoredConnectionByAccount(config.id, providerAccountId);
+      const existing = input.existingConnectionId
+        ? await getStoredConnection(input.existingConnectionId)
+        : await findStoredConnectionByAccount(input.userId, config.id, providerAccountId);
 
       const now = new Date();
       const expiresAt = new Date(now.getTime() + tokenResponse.expiresIn * 1000).toISOString();
@@ -178,6 +180,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
       const nowIso = now.toISOString();
       const record: StoredConnection = {
         id: existing?.id ?? crypto.randomUUID(),
+        userId: input.userId,
         provider: config.id,
         providerAccountId,
         displayName: existing?.displayName || name || email,
@@ -196,12 +199,12 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
         metadata: existing?.metadata ?? {},
       };
 
-      upsertStoredConnection(record);
+      await upsertStoredConnection(record);
       return record;
     },
 
     async disconnect(connectionId: string): Promise<void> {
-      const existing = getStoredConnection(connectionId);
+      const existing = await getStoredConnection(connectionId);
       if (!existing) return;
 
       const tokenToRevoke = existing.tokens?.refreshToken ?? existing.tokens?.accessToken;
@@ -210,7 +213,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
       }
 
       const now = new Date().toISOString();
-      upsertStoredConnection({
+      await upsertStoredConnection({
         ...existing,
         status: "disconnected",
         tokens: null, // wipe token material entirely — nothing secret stays on file
@@ -224,7 +227,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
     validateConnection,
 
     async health(connectionId: string): Promise<ConnectionHealth> {
-      const existing = getStoredConnection(connectionId);
+      const existing = await getStoredConnection(connectionId);
       if (!existing) return { status: "disconnected", message: "Connection not found.", checkedAt: new Date().toISOString() };
       if (existing.status !== "connected" || !existing.tokens) return existing.health;
 
@@ -233,7 +236,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
           const refreshed = await refreshToken(connectionId);
           return refreshed.health;
         } catch {
-          return (getStoredConnection(connectionId) ?? existing).health;
+          return (await getStoredConnection(connectionId) ?? existing).health;
         }
       }
 
@@ -242,7 +245,7 @@ function createProvider(config: ProviderFactoryConfig): ConnectionProvider {
       const health: ConnectionHealth = valid
         ? { status: "healthy", message: "Connected and validated.", checkedAt }
         : { status: "authentication-failed", message: "The provider rejected the current token.", checkedAt };
-      upsertStoredConnection({ ...existing, lastValidated: checkedAt, health });
+      await upsertStoredConnection({ ...existing, lastValidated: checkedAt, health });
       return health;
     },
 

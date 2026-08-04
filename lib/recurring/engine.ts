@@ -40,22 +40,24 @@ function titleCase(raw: string): string {
 }
 
 /**
- * Deterministic, rule-based recurring detection — no LLM. Runs the
- * matcher and predictor over transaction history, classifies each
- * candidate as income/expense/subscription using the same category and
- * merchant-knowledge signals the rest of the app already trusts, then
- * hands the fresh snapshot to the registry to persist and diff against
- * what was previously known.
+ * Deterministic, rule-based recurring detection — no LLM. Runs the matcher
+ * and predictor over transaction history and classifies each candidate as
+ * income/expense/subscription using the same category and
+ * merchant-knowledge signals the rest of the app already trusts. Pure —
+ * no persistence — so both detectRecurringTransactions below (the
+ * localStorage-backed path) and services/recurring/recurring-service.ts
+ * (the Postgres-backed path) share this exact business logic rather than
+ * each re-implementing it.
  */
-export function detectRecurringTransactions(
+export function buildFreshRecurringItems(
   transactions: Transaction[],
   merchantProfiles: MerchantProfile[],
   now: Date = new Date(),
-): RecurringReconciliation {
+): RecurringTransaction[] {
   const merchantById = new Map(merchantProfiles.map((p) => [p.id, p]));
   const candidates = findRecurringCandidates(transactions);
 
-  const freshItems: RecurringTransaction[] = candidates.map((candidate) => {
+  return candidates.map((candidate) => {
     const frequency = inferFrequency(candidate.gaps);
     const last = candidate.transactions[candidate.transactions.length - 1];
     const nextExpectedOccurrence = predictNextOccurrence(last.date, frequency);
@@ -111,6 +113,18 @@ export function detectRecurringTransactions(
       updatedAt: now.toISOString(),
     };
   });
+}
 
+/** Runs buildFreshRecurringItems then hands the fresh snapshot to the
+ * (localStorage-backed) registry to persist and diff against what was
+ * previously known. See services/recurring/recurring-service.ts for the
+ * Postgres-backed equivalent, which calls buildFreshRecurringItems
+ * directly instead. */
+export function detectRecurringTransactions(
+  transactions: Transaction[],
+  merchantProfiles: MerchantProfile[],
+  now: Date = new Date(),
+): RecurringReconciliation {
+  const freshItems = buildFreshRecurringItems(transactions, merchantProfiles, now);
   return reconcileRecurring(freshItems);
 }

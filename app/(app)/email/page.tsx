@@ -1,9 +1,11 @@
 import DataSourceStatusStrip from "@/components/dataSources/DataSourceStatusStrip";
 import EmailDashboard from "@/components/EmailDashboard";
 import { getConnections } from "@/lib/connections/engine";
+import { getCurrentUserId } from "@/lib/auth/session";
 
-export default function EmailPage() {
-  const connections = getConnections();
+export default async function EmailPage() {
+  const userId = await getCurrentUserId();
+  const connections = userId ? await getConnections(userId) : [];
 
   return (
     <div className="flex flex-col gap-8">

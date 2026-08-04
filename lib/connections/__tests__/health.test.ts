@@ -5,6 +5,7 @@ import type { StoredConnection } from "@/lib/connections/types";
 function baseRecord(overrides: Partial<StoredConnection> = {}): StoredConnection {
   return {
     id: "c1",
+    userId: "u-test",
     provider: "google",
     providerAccountId: "u1",
     displayName: "Gmail",

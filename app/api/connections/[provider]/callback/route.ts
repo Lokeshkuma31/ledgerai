@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { completeConnection } from "@/lib/connections/engine";
 import { readAndClearOAuthSessionCookie } from "@/lib/connections/session";
+import { getCurrentUserId } from "@/lib/auth/session";
 import { PROVIDER_IDS, type ProviderId } from "@/lib/connections/types";
 
 export const runtime = "nodejs";
@@ -43,12 +44,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
     );
   }
 
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.redirect(new URL(`/sign-in?redirect=/connections`, origin));
+  }
+
   try {
     await completeConnection({
       providerId: provider,
       code,
       codeVerifier: session.codeVerifier,
       redirectUri: `${origin}/api/connections/${provider}/callback`,
+      userId,
       existingConnectionId: session.reconnectId,
     });
   } catch (error) {
