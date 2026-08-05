@@ -1,6 +1,11 @@
-# Phase 2 Implementation — Complete
+# Observability Platform — Complete (Phase 1 design + Phase 2 implementation)
 
-All 20 implementation tasks (#12–#31) are done. `next build` succeeds cleanly (no errors, no Sentry warnings), and the full test suite passes (498/498, 68 files).
+**Status: done, committed, and pushed to `origin/master`.**
+
+- `c5094c0` — Phase 1: ten design docs (this directory, `01-*` through `10-*` + `README.md`)
+- `34285a1` — Phase 2: full implementation (53 files, +2491/-207)
+
+All 20 implementation tasks (#12–#31) are done. `next build` succeeds cleanly (no errors, no Sentry warnings), and the full test suite passes (498/498, 68 files). Nothing further is pending from this work — the sections below are a reference for anyone (human or a future session) picking this codebase back up, not a to-do list.
 
 ## What shipped
 
