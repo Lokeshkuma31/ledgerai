@@ -25,6 +25,7 @@ import { registerIndexContributor } from "@/lib/index";
 import { registerCoachImportSummaryContributor, type CoachImportSummaryContribution } from "@/lib/coach/contributors";
 import { assertOwnership } from "@/lib/auth/authorize";
 import { recordAuditEvent } from "@/lib/audit/log";
+import { capture } from "@/lib/observability/analytics";
 import type { ConnectionHistoryEvent, ConnectionRecord, ProviderDescriptor, ProviderId } from "@/lib/connections/types";
 import type { FeedItem } from "@/types/feed";
 import type { IndexedObject } from "@/types/index";
@@ -112,6 +113,10 @@ export async function completeConnection(input: CompleteConnectionInput): Promis
     userId: input.userId,
     after: record,
   });
+  capture(isReconnect ? "provider_reconnected" : "provider_connected", input.userId, {
+    provider: stored.provider,
+    connection_id: stored.id,
+  });
   await refreshConnectionCache();
   return record;
 }
@@ -150,6 +155,7 @@ export async function disconnectConnection(id: string, userId: string): Promise<
     userId,
     before: toConnectionRecord(existing),
   });
+  capture("provider_disconnected", userId, { provider: existing.provider, connection_id: id, reason: "user_initiated" });
   await refreshConnectionCache();
   return getConnectionRecord(id);
 }
@@ -182,6 +188,7 @@ export async function refreshConnection(id: string, userId: string): Promise<Con
       entityId: id,
       userId,
     });
+    if (!revoked) capture("provider_token_refresh_failed", userId, { provider: existing.provider, connection_id: id });
     await refreshConnectionCache();
     throw error;
   }

@@ -27,7 +27,9 @@ function collectContributedObjects(): IndexedObject[] {
     try {
       objects.push(...contributor());
     } catch (error) {
-      console.error("A search-provider plugin threw while contributing index objects:", error);
+      // Not server-only — this module is reachable from Client Components,
+      // same reasoning as lib/feed/engine.ts.
+      console.warn("A search-provider plugin threw while contributing index objects:", error);
     }
   }
   return objects;

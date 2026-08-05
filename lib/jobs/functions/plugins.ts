@@ -9,6 +9,7 @@ import { registerSchedule } from "@/lib/jobs/scheduler";
 import { serializeError } from "@/lib/jobs/retry";
 import { getAllPluginInstances } from "@/lib/plugins/registry";
 import * as pluginService from "@/services/plugins/plugin-service";
+import { captureFromContext } from "@/lib/observability/analytics";
 
 export const pluginHealthCheck = registerSchedule(
   { id: "plugin-health-check", name: "Plugin Health Check", cron: "*/30 * * * *", retries: 2 },
@@ -22,6 +23,9 @@ export const pluginHealthCheck = registerSchedule(
         await step.run(`health-${plugin.id}`, async () => {
           const health = await plugin.health();
           await pluginService.recordPluginHealth(plugin.id, health);
+          if (health.status !== "healthy") {
+            captureFromContext("plugin_health_degraded", { plugin_id: plugin.id, status: health.status });
+          }
         });
         checked += 1;
       } catch (error) {

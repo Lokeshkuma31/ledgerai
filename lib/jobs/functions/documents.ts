@@ -21,8 +21,15 @@ import { buildKey } from "@/lib/jobs/idempotency";
 import { orgConcurrency, globalConcurrency } from "@/lib/jobs/queue";
 import { analyzeDocument } from "@/plugins/document-intelligence/engine";
 import * as documentService from "@/services/documents/document-service";
+import { capture } from "@/lib/observability/analytics";
 import type { EventPayload } from "@/lib/jobs/events";
 import type { DocumentStatus } from "@/plugins/document-intelligence/types";
+
+function sizeBucket(sizeBytes: number): "small" | "medium" | "large" {
+  if (sizeBytes < 500_000) return "small";
+  if (sizeBytes < 5_000_000) return "medium";
+  return "large";
+}
 
 type Trigger = EventPayload<"ledger/document.uploaded">;
 
@@ -91,6 +98,12 @@ export const documentParse = defineJob<Trigger>(
       },
       { id: buildKey("document-parsed", documentId) },
     );
+
+    if (status === "failed") {
+      capture("document_parse_failed", organizationId, { document_id: record.id, failure_reason: "no_text_extracted" });
+    } else {
+      capture("document_imported", organizationId, { document_type: analysis.classification.type, size_bucket: sizeBucket(sizeBytes) });
+    }
 
     return { documentId: record.id, status: record.status, confidence: analysis.fields.confidence };
   },

@@ -43,7 +43,9 @@ export function collectCoachImportSummaries(): CoachImportSummaryContribution[] 
       const result = contributor();
       if (result) summaries.push(result);
     } catch (error) {
-      console.error("An import-summary plugin threw while contributing to the Coach:", error);
+      // Not server-only — reachable from Client Components (e.g.
+      // components/DashboardProvider.tsx via lib/intelligence/orchestrator.ts).
+      console.warn("An import-summary plugin threw while contributing to the Coach:", error);
     }
   }
   return summaries;
@@ -81,7 +83,7 @@ export function collectCoachAccountSummaries(): BankCoachAccountSummary[] {
       const result = contributor();
       if (result) summaries.push(result);
     } catch (error) {
-      console.error("A bank-account-summary plugin threw while contributing to the Coach:", error);
+      console.warn("A bank-account-summary plugin threw while contributing to the Coach:", error);
     }
   }
   return summaries;
@@ -121,7 +123,7 @@ export function collectCoachSyncSummaries(): SyncCoachSummary[] {
     try {
       summaries.push(...contributor());
     } catch (error) {
-      console.error("A sync-summary plugin threw while contributing to the Coach:", error);
+      console.warn("A sync-summary plugin threw while contributing to the Coach:", error);
     }
   }
   return summaries;

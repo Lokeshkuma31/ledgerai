@@ -56,7 +56,11 @@ function collectContributedFeedItems(): FeedItem[] {
     try {
       items.push(...contributor());
     } catch (error) {
-      console.error("A feed contributor plugin threw while generating items:", error);
+      // lib/observability/logger.ts is server-only and can't be imported
+      // here — this module is reachable from Client Components (e.g.
+      // components/WorkflowsOverview.tsx), unlike lib/api/error-handler.ts/
+      // lib/audit/log.ts, which were already server-only before this pass.
+      console.warn("A feed contributor plugin threw while generating items:", error);
     }
   }
   return items;

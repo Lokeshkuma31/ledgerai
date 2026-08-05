@@ -2,6 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 import { apiRateLimit } from "@/lib/cache/redis";
 
+// Correlation ID minting/propagation (docs/observability/09-correlation-id-strategy.md).
+// middleware.ts runs on the Edge runtime by default, which doesn't support
+// node:async_hooks — so this deliberately does NOT import
+// lib/observability/context.ts (AsyncLocalStorage-based, Node-only).
+// Minting here only needs Web Crypto's randomUUID(), available on both
+// Edge and Node; downstream Route Handlers/Server Actions read the
+// propagated x-correlation-id header via next/headers and enter their own
+// AsyncLocalStorage context from it.
+function getOrMintCorrelationId(request: NextRequest): string {
+  return request.headers.get("x-correlation-id") ?? `corr_${crypto.randomUUID()}`;
+}
+
 // Fast, Edge-compatible presence check only (no DB round-trip) — the
 // actual session is validated server-side via lib/auth/session.ts wherever
 // a page/action/route needs the real user id. This just keeps signed-out
@@ -63,7 +75,7 @@ function buildCsp(): string {
 
 const CSP = buildCsp();
 
-function applySecurityHeaders(response: NextResponse): NextResponse {
+function applySecurityHeaders(response: NextResponse, correlationId: string): NextResponse {
   response.headers.set("Content-Security-Policy", CSP);
   response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   response.headers.set("X-Frame-Options", "DENY");
@@ -71,11 +83,28 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=()");
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  // Echoed on every response so a client-side error report can be matched
+  // to server-side logs without the user needing to know what a trace id
+  // is — see docs/observability/09-correlation-id-strategy.md.
+  response.headers.set("x-correlation-id", correlationId);
   return response;
+}
+
+/** Forwards the correlation id to the Route Handler/Server Action this
+ * request reaches, via a request header downstream code reads through
+ * next/headers — the only propagation path available from Edge
+ * middleware into Node-runtime handlers (see the getOrMintCorrelationId
+ * comment above). */
+function withCorrelationHeader(request: NextRequest, correlationId: string): Headers {
+  const headers = new Headers(request.headers);
+  headers.set("x-correlation-id", correlationId);
+  return headers;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const correlationId = getOrMintCorrelationId(request);
+  const forwardedHeaders = withCorrelationHeader(request, correlationId);
 
   if (needsRateLimit(pathname)) {
     const identifier = getClientIdentifier(request);
@@ -83,20 +112,23 @@ export async function middleware(request: NextRequest) {
     if (!success) {
       return applySecurityHeaders(
         NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 }),
+        correlationId,
       );
     }
   }
 
-  if (!isProtected(pathname)) return applySecurityHeaders(NextResponse.next());
+  if (!isProtected(pathname)) {
+    return applySecurityHeaders(NextResponse.next({ request: { headers: forwardedHeaders } }), correlationId);
+  }
 
   const sessionToken = getSessionCookie(request);
   if (!sessionToken) {
     const signInUrl = new URL("/sign-in", request.url);
     signInUrl.searchParams.set("redirect", pathname);
-    return applySecurityHeaders(NextResponse.redirect(signInUrl));
+    return applySecurityHeaders(NextResponse.redirect(signInUrl), correlationId);
   }
 
-  return applySecurityHeaders(NextResponse.next());
+  return applySecurityHeaders(NextResponse.next({ request: { headers: forwardedHeaders } }), correlationId);
 }
 
 export const config = {

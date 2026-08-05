@@ -4,6 +4,17 @@ import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/db/prisma";
 import { BUILT_IN_WORKFLOWS } from "@/lib/workflows/built-in-workflows";
 import { recordAuditEvent } from "@/lib/audit/log";
+import { capture } from "@/lib/observability/analytics";
+import { recordAuthResult } from "@/lib/observability/metrics";
+
+/** Both signup and login capture the account's provider the same way —
+ * a cheap lookup against the oAuthAccount table this app already
+ * maintains (see the `account` config above), rather than guessing from
+ * fields Better Auth's hook payloads don't expose. */
+async function resolveAuthMethod(userId: string): Promise<"email" | "google"> {
+  const account = await prisma.oAuthAccount.findFirst({ where: { userId }, select: { provider: true } });
+  return account?.provider === "google" ? "google" : "email";
+}
 
 // Better Auth is exclusively user identity/login. It is intentionally kept
 // separate from the Connection Hub (lib/connections/*), which is OAuth for
@@ -98,6 +109,9 @@ export const auth = betterAuth({
             userId: user.id,
             organizationId: organization.id,
           });
+          const signupMethod = await resolveAuthMethod(user.id);
+          capture("user_signed_up", user.id, { signup_method: signupMethod });
+          recordAuthResult(true, signupMethod);
         },
       },
     },
@@ -111,6 +125,9 @@ export const auth = betterAuth({
             userId: session.userId,
             ip: session.ipAddress ?? null,
           });
+          const loginMethod = await resolveAuthMethod(session.userId);
+          capture("user_logged_in", session.userId, { login_method: loginMethod });
+          recordAuthResult(true, loginMethod);
         },
       },
     },

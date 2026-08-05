@@ -13,6 +13,7 @@ import { dispatch } from "@/lib/jobs/dispatcher";
 import { buildKey } from "@/lib/jobs/idempotency";
 import { mutex, globalConcurrency } from "@/lib/jobs/queue";
 import * as syncJobService from "@/services/sync/sync-job-service";
+import { capture } from "@/lib/observability/analytics";
 import type { EventPayload } from "@/lib/jobs/events";
 import type { ProviderCategoryInput } from "@/repositories/sync-job-repository";
 import type { SyncJobType } from "@/lib/sync/types";
@@ -40,6 +41,7 @@ export const syncStart = defineJob<EventPayload<"ledger/connection.created">>(
       },
       { id: buildKey("sync-started", organizationId, provider, "initial") },
     );
+    capture("sync_started", organizationId, { provider, sync_type: "initial" });
     return { dispatched: true };
   },
 );
@@ -93,27 +95,39 @@ export const syncRun = defineJob<EventPayload<"ledger/sync.started">>(
       ),
     );
 
-    // --- real provider sync would run here, paginating with
-    // job.lastCheckpoint and calling services/email/email-import-service.ts
-    // ::recordEmail (or services/banks/bank-sync-service.ts for bank
-    // providers) per message/transaction. Deferred — see this file's
-    // header comment. ---
+    try {
+      // --- real provider sync would run here, paginating with
+      // job.lastCheckpoint and calling services/email/email-import-service.ts
+      // ::recordEmail (or services/banks/bank-sync-service.ts for bank
+      // providers) per message/transaction. Deferred — see this file's
+      // header comment. ---
 
-    const completedAt = new Date();
-    await step.run("record-completed", () =>
-      syncJobService.recordSyncJob(
-        organizationId,
-        { ...job, status: "completed", completedAt: completedAt.toISOString(), duration: completedAt.getTime() - startedAt.getTime() },
-        providerCategory as ProviderCategoryInput,
-      ),
-    );
+      const completedAt = new Date();
+      const durationMs = completedAt.getTime() - startedAt.getTime();
+      await step.run("record-completed", () =>
+        syncJobService.recordSyncJob(
+          organizationId,
+          { ...job, status: "completed", completedAt: completedAt.toISOString(), duration: durationMs },
+          providerCategory as ProviderCategoryInput,
+        ),
+      );
 
-    await dispatch(
-      "ledger/sync.completed",
-      { organizationId, correlationId, syncJobId: job.id, itemsImported: 0, itemsSkipped: 0, duplicates: 0 },
-      { id: buildKey("sync-completed", job.id) },
-    );
+      await dispatch(
+        "ledger/sync.completed",
+        { organizationId, correlationId, syncJobId: job.id, itemsImported: 0, itemsSkipped: 0, duplicates: 0 },
+        { id: buildKey("sync-completed", job.id) },
+      );
+      capture("sync_completed", organizationId, { provider: providerId, sync_type: event.data.runType, duration_ms: durationMs, items_synced: 0 });
 
-    return { syncJobId: job.id, itemsImported: 0 };
+      return { syncJobId: job.id, itemsImported: 0 };
+    } catch (error) {
+      await dispatch(
+        "ledger/sync.failed",
+        { organizationId, correlationId, syncJobId: job.id, errorClass: "sync_execution_error", message: error instanceof Error ? error.message : "Unknown error" },
+        { id: buildKey("sync-failed", job.id) },
+      ).catch(() => undefined);
+      capture("sync_failed", organizationId, { provider: providerId, sync_type: event.data.runType, failure_reason: error instanceof Error ? error.message : "unknown" });
+      throw error;
+    }
   },
 );

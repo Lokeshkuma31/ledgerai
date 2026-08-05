@@ -5,6 +5,7 @@ import { requireUserId, getCurrentMembership } from "@/lib/auth/session";
 import { retryDeadLetter as retryDeadLetterJob } from "@/lib/jobs/dead-letter";
 import { dispatch } from "@/lib/jobs/dispatcher";
 import * as jobService from "@/services/jobs/job-service";
+import { runActionTelemetry } from "@/lib/observability/telemetry";
 
 async function requireOwner() {
   const userId = await requireUserId();
@@ -17,9 +18,11 @@ async function requireOwner() {
  * lib/jobs/dead-letter.ts::retryDeadLetter — see
  * docs/job-platform/05-retry-strategy.md §5.6. */
 export async function retryDeadLetterAction(deadLetterId: string): Promise<void> {
-  const userId = await requireOwner();
-  await retryDeadLetterJob(deadLetterId, userId);
-  revalidatePath("/jobs");
+  return runActionTelemetry("retryDeadLetter", async () => {
+    const userId = await requireOwner();
+    await retryDeadLetterJob(deadLetterId, userId);
+    revalidatePath("/jobs");
+  });
 }
 
 /** Cancels an in-flight job — dispatches the cancellation-matching event
@@ -29,21 +32,23 @@ export async function retryDeadLetterAction(deadLetterId: string): Promise<void>
  * cancellation doesn't call back application code (see
  * docs/job-platform/08-worker-architecture.md §8.5). */
 export async function cancelJobAction(jobRunId: string): Promise<void> {
-  await requireOwner();
-  const run = await jobService.getRunById(jobRunId);
-  if (!run) return;
+  return runActionTelemetry("cancelJob", async () => {
+    await requireOwner();
+    const run = await jobService.getRunById(jobRunId);
+    if (!run) return;
 
-  if (run.jobType === "sync-run") {
-    const data = run.input as { connectionId?: string } | null;
-    if (data?.connectionId) {
-      await dispatch("ledger/connection.disconnected", {
-        organizationId: run.organizationId ?? undefined,
-        connectionId: data.connectionId,
-        provider: "unknown",
-      });
+    if (run.jobType === "sync-run") {
+      const data = run.input as { connectionId?: string } | null;
+      if (data?.connectionId) {
+        await dispatch("ledger/connection.disconnected", {
+          organizationId: run.organizationId ?? undefined,
+          connectionId: data.connectionId,
+          provider: "unknown",
+        });
+      }
     }
-  }
-  await jobService.markCancelled({ jobType: run.jobType, inngestEventId: run.inngestEventId });
-  revalidatePath("/jobs");
-  revalidatePath(`/jobs/${jobRunId}`);
+    await jobService.markCancelled({ jobType: run.jobType, inngestEventId: run.inngestEventId });
+    revalidatePath("/jobs");
+    revalidatePath(`/jobs/${jobRunId}`);
+  });
 }

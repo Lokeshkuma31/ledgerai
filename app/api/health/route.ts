@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkBackgroundJobs, checkDatabase, checkOAuthProviders, checkRedis, checkStorage } from "@/lib/health/checks";
-import packageJson from "@/package.json";
+import { getFullHealthSnapshot } from "@/lib/observability/health";
 
 export const runtime = "nodejs";
 // Health status must never be served from a cache — every request re-runs
@@ -9,37 +8,17 @@ export const dynamic = "force-dynamic";
 
 /**
  * Comprehensive health status: database, Redis, object storage, OAuth
- * provider configuration, and background-job wiring, plus version/
- * environment metadata. `/api/readiness` and `/api/liveness` are lighter,
- * narrower-purpose siblings of this endpoint — see
- * docs/security-hardening/01-remediation-plan.md, Priority 5.
+ * provider configuration, background-job wiring, queue depth, and plugin
+ * health, plus version/environment metadata. `/api/readiness` and
+ * `/api/liveness` are lighter, narrower-purpose siblings of this endpoint
+ * — see docs/security-hardening/01-remediation-plan.md, Priority 5, and
+ * docs/observability/06-health-monitoring-design.md.
+ *
+ * Aggregation itself lives in lib/observability/health.ts's
+ * getFullHealthSnapshot() so this route and /admin/observability can
+ * never disagree about what "healthy" means.
  */
 export async function GET() {
-  const [database, cache, storage] = await Promise.all([checkDatabase(), checkRedis(), checkStorage()]);
-  const oauth = checkOAuthProviders();
-  const backgroundJobs = checkBackgroundJobs();
-
-  // Only checks that actually gate "can this app safely serve real
-  // requests" (database, cache) count toward the overall status — storage/
-  // OAuth/background-job being unconfigured is a real gap (surfaced in the
-  // response either way) but shouldn't flip the whole app to "unhealthy"
-  // for, say, a dev environment that hasn't provisioned R2 yet.
-  const healthy = database.status === "ok" && cache.status === "ok";
-
-  const body = {
-    status: healthy ? "healthy" : "unhealthy",
-    version: packageJson.version,
-    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
-    commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-    timestamp: new Date().toISOString(),
-    checks: {
-      database,
-      redis: cache,
-      storage,
-      oauth,
-      backgroundJobs,
-    },
-  };
-
-  return NextResponse.json(body, { status: healthy ? 200 : 503 });
+  const snapshot = await getFullHealthSnapshot();
+  return NextResponse.json(snapshot, { status: snapshot.status === "healthy" ? 200 : 503 });
 }

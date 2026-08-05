@@ -9,6 +9,12 @@
  * HTTP redirect to the provider, which only a Route Handler
  * (app/api/connections/[provider]/authorize/route.ts) can issue; a plain
  * link to that route is the "Connect"/"Reconnect" button's href.
+ *
+ * Every export is also wrapped in runActionTelemetry (docs/observability/
+ * 04-tracing-strategy.md's Server Action section) — one of only two
+ * Server Action modules in the codebase, so this is the whole surface
+ * that needed wrapping to get tracing/correlation-id/metrics coverage
+ * for every connection mutation.
  */
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth/session";
@@ -16,6 +22,7 @@ import { connectionMutationRateLimit } from "@/lib/cache/redis";
 import { RateLimitedError } from "@/lib/api/errors";
 import { recordAuditEvent } from "@/lib/audit/log";
 import { checkAndRecordHealth, disconnectConnection, refreshConnection, renameConnection } from "@/lib/connections/engine";
+import { runActionTelemetry } from "@/lib/observability/telemetry";
 import type { ConnectionRecord } from "@/lib/connections/types";
 
 // Every action below resolves+authenticates the caller (requireUserId())
@@ -41,38 +48,46 @@ async function guardMutationRate(userId: string): Promise<void> {
 }
 
 export async function disconnectConnectionAction(id: string): Promise<ConnectionRecord | undefined> {
-  const userId = await requireUserId();
-  await guardMutationRate(userId);
-  const result = await disconnectConnection(id, userId);
-  revalidatePath("/connections");
-  return result;
+  return runActionTelemetry("disconnectConnection", async () => {
+    const userId = await requireUserId();
+    await guardMutationRate(userId);
+    const result = await disconnectConnection(id, userId);
+    revalidatePath("/connections");
+    return result;
+  });
 }
 
 export async function refreshConnectionAction(id: string): Promise<{ record?: ConnectionRecord; error?: string }> {
-  try {
-    const userId = await requireUserId();
-    await guardMutationRate(userId);
-    const record = await refreshConnection(id, userId);
-    revalidatePath("/connections");
-    return { record };
-  } catch (error) {
-    revalidatePath("/connections");
-    return { error: error instanceof Error ? error.message : "Refresh failed." };
-  }
+  return runActionTelemetry("refreshConnection", async () => {
+    try {
+      const userId = await requireUserId();
+      await guardMutationRate(userId);
+      const record = await refreshConnection(id, userId);
+      revalidatePath("/connections");
+      return { record };
+    } catch (error) {
+      revalidatePath("/connections");
+      return { error: error instanceof Error ? error.message : "Refresh failed." };
+    }
+  });
 }
 
 export async function renameConnectionAction(id: string, displayName: string): Promise<ConnectionRecord | undefined> {
-  const userId = await requireUserId();
-  await guardMutationRate(userId);
-  const result = await renameConnection(id, displayName, userId);
-  revalidatePath("/connections");
-  return result;
+  return runActionTelemetry("renameConnection", async () => {
+    const userId = await requireUserId();
+    await guardMutationRate(userId);
+    const result = await renameConnection(id, displayName, userId);
+    revalidatePath("/connections");
+    return result;
+  });
 }
 
 export async function checkConnectionHealthAction(id: string): Promise<ConnectionRecord | undefined> {
-  const userId = await requireUserId();
-  await guardMutationRate(userId);
-  const result = await checkAndRecordHealth(id, userId);
-  revalidatePath("/connections");
-  return result;
+  return runActionTelemetry("checkConnectionHealth", async () => {
+    const userId = await requireUserId();
+    await guardMutationRate(userId);
+    const result = await checkAndRecordHealth(id, userId);
+    revalidatePath("/connections");
+    return result;
+  });
 }

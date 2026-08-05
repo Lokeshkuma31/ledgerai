@@ -11,6 +11,7 @@
  */
 import "server-only";
 import { createAuditLog, type CreateAuditLogInput } from "@/repositories/audit-log-repository";
+import { logger } from "@/lib/observability/logger";
 
 export type AuditEventInput = CreateAuditLogInput;
 
@@ -18,6 +19,6 @@ export async function recordAuditEvent(event: AuditEventInput): Promise<void> {
   try {
     await createAuditLog(event);
   } catch (error) {
-    console.error("[audit]", error);
+    logger().error({ err: error, action: event.action }, "[audit] failed to record audit event");
   }
 }

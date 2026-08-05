@@ -10,6 +10,7 @@ import {
   reloadPlugin,
   uninstallPlugin,
 } from "@/lib/plugins/engine";
+import { captureClient } from "@/lib/observability/analytics-client";
 import type { PluginRecord } from "@/types/plugin";
 
 /**
@@ -45,7 +46,11 @@ export default function PluginSettings() {
   }
 
   function handleToggleEnabled(plugin: PluginRecord) {
-    void withBusy(plugin.id, () => (plugin.enabled ? disablePlugin(plugin.id) : enablePlugin(plugin.id)));
+    const willEnable = !plugin.enabled;
+    void withBusy(plugin.id, () => (plugin.enabled ? disablePlugin(plugin.id) : enablePlugin(plugin.id))).then(() => {
+      if (willEnable) captureClient("plugin_enabled", { plugin_id: plugin.id, plugin_version: plugin.version });
+      else captureClient("plugin_disabled", { plugin_id: plugin.id });
+    });
   }
 
   function handleReload(plugin: PluginRecord) {

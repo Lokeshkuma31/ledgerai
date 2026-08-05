@@ -35,7 +35,9 @@ export async function loadPlugins(): Promise<void> {
     try {
       await installPlugin(plugin);
     } catch (error) {
-      console.error(`Plugin "${plugin.id}" failed to load:`, error);
+      // Not server-only — reachable from Client Components (e.g.
+      // components/PluginSettings.tsx calls loadPlugins() directly).
+      console.warn(`Plugin "${plugin.id}" failed to load:`, error);
     }
   }
 

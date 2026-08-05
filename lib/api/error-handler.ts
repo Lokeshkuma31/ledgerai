@@ -10,6 +10,9 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/src/generated/prisma/client";
 import { ZodError } from "zod";
 import { AppError, type ErrorCode } from "@/lib/api/errors";
+import { logger } from "@/lib/observability/logger";
+import { captureException } from "@/lib/observability/errors";
+import { recordError } from "@/lib/observability/metrics";
 
 interface NormalizedError {
   statusCode: number;
@@ -46,12 +49,17 @@ function normalize(error: unknown): NormalizedError {
 }
 
 /** Every Route Handler's catch block calls this — logs the real error
- * server-side (stack trace, not just the sanitized message) and returns
- * the client-safe shape. */
+ * server-side (stack trace, not just the sanitized message), reports it
+ * to Sentry, and returns the client-safe shape. This is the single
+ * funnel point every Route Handler's 5xx-class error passes through, so
+ * it's also the single place Sentry/logger wiring needed to happen — see
+ * docs/observability/02-telemetry-strategy.md's "Principle". */
 export function handleApiError(error: unknown): NextResponse {
   const normalized = normalize(error);
   if (normalized.statusCode >= 500) {
-    console.error("[api]", error);
+    logger().error({ err: error, errorCode: normalized.code }, "[api] request failed");
+    captureException(error, { errorCode: normalized.code });
+    recordError(normalized.code);
   }
   return NextResponse.json(
     { error: { code: normalized.code, message: normalized.message, details: normalized.details } },
@@ -69,7 +77,9 @@ export type ActionResult<T> =
 export function handleActionError(error: unknown): ActionResult<never> {
   const normalized = normalize(error);
   if (normalized.statusCode >= 500) {
-    console.error("[action]", error);
+    logger().error({ err: error, errorCode: normalized.code }, "[action] action failed");
+    captureException(error, { errorCode: normalized.code });
+    recordError(normalized.code);
   }
   return { ok: false, error: { code: normalized.code, message: normalized.message, details: normalized.details } };
 }

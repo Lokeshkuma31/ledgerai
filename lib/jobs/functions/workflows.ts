@@ -25,6 +25,7 @@ import { executeWorkflow } from "@/lib/workflows/executor";
 import * as workflowService from "@/services/workflows/workflow-service";
 import { listTransactions } from "@/services/transactions/transaction-service";
 import { getBudgetStatuses } from "@/services/budgets/budget-service";
+import { capture } from "@/lib/observability/analytics";
 import type { EventPayload } from "@/lib/jobs/events";
 import type { WorkflowTrigger } from "@/types/workflow";
 
@@ -59,6 +60,7 @@ export const workflowExecute = defineJob<EventPayload<"ledger/workflow.trigger">
 
     const results: { workflowId: string; runId: string; status: string }[] = [];
     for (const definition of enabled) {
+      const runStart = Date.now();
       const run = await step.run(`run-${definition.id}`, async () => {
         const context = { ...payload, transactions, budgetStatuses };
         const executed = await executeWorkflow(definition, context, trigger, new Date());
@@ -71,6 +73,11 @@ export const workflowExecute = defineJob<EventPayload<"ledger/workflow.trigger">
         return executed;
       });
       results.push({ workflowId: definition.id, runId: run.runId, status: run.status });
+      capture("workflow_executed", organizationId, {
+        workflow_id: definition.id,
+        status: run.status,
+        duration_ms: Date.now() - runStart,
+      });
     }
 
     // One workflow.completed dispatch per run — downstream fan-in

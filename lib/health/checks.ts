@@ -16,6 +16,9 @@ import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/db/prisma";
 import { redis } from "@/lib/cache/redis";
 import { r2, R2_BUCKET } from "@/lib/storage/r2";
+import * as jobService from "@/services/jobs/job-service";
+import * as pluginService from "@/services/plugins/plugin-service";
+import { withExternalSpan } from "@/lib/observability/tracing";
 
 export type CheckStatus = "ok" | "error" | "unconfigured";
 
@@ -46,7 +49,7 @@ export async function checkDatabase(): Promise<CheckResult> {
 }
 
 export async function checkRedis(): Promise<CheckResult> {
-  const { latencyMs, error } = await timed(() => redis.ping());
+  const { latencyMs, error } = await timed(() => withExternalSpan("redis.ping", { "redis.command": "ping" }, () => redis.ping()));
   if (error) return { status: "error", message: toMessage(error), latencyMs };
   return { status: "ok", latencyMs };
 }
@@ -103,4 +106,56 @@ export function checkBackgroundJobs(): CheckResult {
     status: "ok",
     message: "Inngest client, functions, and /api/inngest route are configured.",
   };
+}
+
+/** Mirrors the alert matrix's queue-growth threshold
+ * (docs/observability/07-alert-matrix.md #5) — 500 pending jobs or a
+ * 15-minute-old oldest-pending job flips this to "degraded". */
+const QUEUE_DEPTH_WARN = 500;
+const OLDEST_PENDING_WARN_MS = 15 * 60 * 1000;
+
+export interface QueueCheckResult extends CheckResult {
+  queueDepth: number;
+  oldestPendingAgeMs: number | null;
+  runningCount: number;
+  deadLetterCount: number;
+}
+
+/** Wraps lib/jobs/metrics.ts's already-implemented getQueueHealth() —
+ * see docs/observability/06-health-monitoring-design.md. No new
+ * aggregation logic; this just exposes the existing computation through
+ * the health-check interface, alongside database/redis/storage/oauth. */
+export async function checkQueueHealth(): Promise<QueueCheckResult> {
+  const { latencyMs, error } = await timed(() => jobService.getQueueHealth());
+  if (error) {
+    return { status: "error", message: toMessage(error), latencyMs, queueDepth: 0, oldestPendingAgeMs: null, runningCount: 0, deadLetterCount: 0 };
+  }
+  const health = await jobService.getQueueHealth();
+  const degraded = health.deadLetterCount > 0 || health.queueDepth > QUEUE_DEPTH_WARN || (health.oldestPendingAgeMs ?? 0) > OLDEST_PENDING_WARN_MS;
+  return {
+    status: degraded ? "error" : "ok",
+    message: degraded ? "Queue depth, oldest-pending age, or dead-letter count exceeds warning thresholds." : undefined,
+    latencyMs,
+    queueDepth: health.queueDepth,
+    oldestPendingAgeMs: health.oldestPendingAgeMs,
+    runningCount: health.runningCount,
+    deadLetterCount: health.deadLetterCount,
+  };
+}
+
+/** Reads the plugin registry's last-recorded health — populated every 30
+ * minutes by the existing pluginHealthCheck Inngest cron job
+ * (lib/jobs/functions/plugins.ts). No new health-probing logic here, just
+ * surfacing what's already collected. */
+export async function checkPlugins(): Promise<Record<string, CheckResult>> {
+  const records = await pluginService.getAllPluginRecords();
+  return Object.fromEntries(
+    records.map((record) => [
+      record.id,
+      {
+        status: record.health.status === "healthy" ? "ok" : record.health.status === "warning" ? "unconfigured" : "error",
+        message: record.health.message,
+      } satisfies CheckResult,
+    ]),
+  );
 }

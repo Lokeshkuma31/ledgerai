@@ -32,7 +32,9 @@ export async function emitHook<T>(hook: PluginHookName, payload: T): Promise<voi
     try {
       await handler(payload);
     } catch (error) {
-      console.error(`Plugin hook handler for "${hook}" failed:`, error);
+      // Not server-only — reachable from Client Components (e.g.
+      // components/PluginSettings.tsx via lib/plugins/engine.ts).
+      console.warn(`Plugin hook handler for "${hook}" failed:`, error);
     }
   }
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentMembership, getCurrentUserId } from "@/lib/auth/session";
 
@@ -19,13 +20,20 @@ export default async function AdminGroupLayout({ children }: { children: React.R
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 p-6">
       <header className="flex items-baseline justify-between border-b pb-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Job Platform</h1>
-          <p className="text-muted-foreground text-sm">Background job execution, retries, and dead-letter inspection.</p>
+        <div className="flex items-center gap-6">
+          <h1 className="text-xl font-semibold tracking-tight">Admin</h1>
+          <nav className="flex items-center gap-4 text-sm">
+            <Link href="/jobs" className="text-muted-foreground hover:text-foreground hover:underline">
+              Job Platform
+            </Link>
+            <Link href="/observability" className="text-muted-foreground hover:text-foreground hover:underline">
+              Observability
+            </Link>
+          </nav>
         </div>
-        <a href="/dashboard" className="text-muted-foreground text-sm hover:underline">
+        <Link href="/dashboard" className="text-muted-foreground text-sm hover:underline">
           Back to app
-        </a>
+        </Link>
       </header>
       {children}
     </div>

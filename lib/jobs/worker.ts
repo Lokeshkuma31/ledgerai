@@ -13,6 +13,11 @@ import type { InngestFunction } from "inngest";
 import { inngest } from "./engine";
 import * as jobService from "@/services/jobs/job-service";
 import { classifyError, throwClassified, retriesFor, buildFailureHandler, serializeError } from "./retry";
+import { runWithContextAsync, updateObservabilityContext } from "@/lib/observability/context";
+import { withJobSpan } from "@/lib/observability/tracing";
+import { logger } from "@/lib/observability/logger";
+import { recordJobDuration } from "@/lib/observability/metrics";
+import { captureException } from "@/lib/observability/errors";
 
 export interface JobContext<TData = Record<string, unknown>> {
   event: { id: string; name: string; data: TData };
@@ -89,42 +94,67 @@ export function defineJob<TData extends Record<string, unknown> = Record<string,
       const organizationId = typeof data.organizationId === "string" ? data.organizationId : undefined;
       const correlationId = typeof data.correlationId === "string" ? data.correlationId : crypto.randomUUID();
 
-      await jobService.createQueued({
-        jobType,
-        eventName: event.name,
-        inngestEventId,
-        organizationId,
-        correlationId,
-        input: event.data,
-      });
-      await jobService.markRunning(key, runId, attempt);
+      // Every job function passes through this one wrapper, so this is the
+      // single place background-job tracing/logging/metrics get wired in —
+      // see docs/observability/04-tracing-strategy.md's Inngest section.
+      // withJobSpan's traceId becomes JobRun.traceId (previously a bare
+      // crypto.randomUUID() placeholder — docs/job-platform/
+      // 08-worker-architecture.md §8.7), and runWithContextAsync makes
+      // correlationId/jobId/jobType available to every logger()/
+      // captureException() call the handler makes without threading them
+      // through manually.
+      return runWithContextAsync({ correlationId, jobType, route: jobType }, () =>
+        withJobSpan(jobType, { "job.inngest_event_id": inngestEventId, "job.retry_count": attempt }, async (span) => {
+          const traceId = span.spanContext().traceId;
+          const jobRun = await jobService.createQueued({
+            jobType,
+            eventName: event.name,
+            inngestEventId,
+            organizationId,
+            correlationId,
+            input: event.data,
+            traceId,
+          });
+          updateObservabilityContext({ jobId: jobRun.id });
+          await jobService.markRunning(key, runId, attempt);
+          logger().info({ jobId: jobRun.id, jobType, attempt }, "job started");
 
-      const reportProgress = async (percent: number) => {
-        await jobService.setProgress(key, percent).catch(() => undefined);
-      };
+          const reportProgress = async (percent: number) => {
+            await jobService.setProgress(key, percent).catch(() => undefined);
+          };
 
-      try {
-        const output = await handler({
-          event,
-          runId,
-          attempt,
-          organizationId,
-          correlationId,
-          reportProgress,
-          step,
-        });
-        await jobService.markCompleted(key, output);
-        return output;
-      } catch (error) {
-        const classification = classifyError(error);
-        const willRetry = classification === "transient" && attempt < retriesFor(jobType);
-        if (willRetry) {
-          await jobService.markRetrying(key, attempt, serializeError(error)).catch(() => undefined);
-        } else {
-          await jobService.markFailed(key, serializeError(error), attempt).catch(() => undefined);
-        }
-        throwClassified(error);
-      }
+          const start = Date.now();
+          try {
+            const output = await handler({
+              event,
+              runId,
+              attempt,
+              organizationId,
+              correlationId,
+              reportProgress,
+              step,
+            });
+            await jobService.markCompleted(key, output);
+            const durationMs = Date.now() - start;
+            recordJobDuration(jobType, durationMs, "success");
+            logger().info({ jobId: jobRun.id, jobType, durationMs }, "job completed");
+            return output;
+          } catch (error) {
+            const durationMs = Date.now() - start;
+            const classification = classifyError(error);
+            const willRetry = classification === "transient" && attempt < retriesFor(jobType);
+            if (willRetry) {
+              await jobService.markRetrying(key, attempt, serializeError(error)).catch(() => undefined);
+            } else {
+              await jobService.markFailed(key, serializeError(error), attempt).catch(() => undefined);
+            }
+            recordJobDuration(jobType, durationMs, "failed");
+            logger().error({ jobId: jobRun.id, jobType, durationMs, willRetry, err: error }, "job failed");
+            captureException(error, { jobId: jobRun.id, jobType });
+            throwClassified(error);
+          }
+        }),
+      );
     },
   );
 }
