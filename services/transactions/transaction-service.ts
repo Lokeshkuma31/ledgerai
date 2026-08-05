@@ -6,11 +6,13 @@
  */
 import { learnCategory } from "@/services/ai-memory/ai-memory-service";
 import * as transactionRepository from "@/repositories/transaction-repository";
-import type { Category, Transaction } from "@/types/transaction";
+import type { Category, ClassificationSource, Transaction } from "@/types/transaction";
 import {
   transactionInputSchema,
   type TransactionInput,
 } from "./transaction-schema";
+import { dispatch } from "@/lib/jobs/dispatcher";
+import { buildKey } from "@/lib/jobs/idempotency";
 
 export async function listTransactions(
   organizationId: string,
@@ -32,7 +34,18 @@ export async function createTransaction(
   input: TransactionInput,
 ): Promise<Transaction> {
   const parsed = transactionInputSchema.parse(input);
-  return transactionRepository.createTransaction(organizationId, parsed);
+  const transaction = await transactionRepository.createTransaction(organizationId, parsed);
+
+  // Publishes the domain event the job platform's classification/
+  // merchant-normalize/feed-generate chain subscribes to — this service
+  // never calls a job directly (docs/job-platform/01-architecture-diagram.md).
+  await dispatch(
+    "ledger/transaction.created",
+    { organizationId, transactionId: transaction.id },
+    { id: buildKey("transaction-created", transaction.id) },
+  ).catch(() => undefined); // best-effort: a dispatch failure must never fail the write that already succeeded
+
+  return transaction;
 }
 
 /** Mirrors lib/storage.ts::addTransactions for bulk sources (e.g. CSV
@@ -40,9 +53,20 @@ export async function createTransaction(
 export async function createTransactions(
   organizationId: string,
   inputs: TransactionInput[],
+  source?: { kind: string; id: string },
 ): Promise<Transaction[]> {
   const parsed = inputs.map((input) => transactionInputSchema.parse(input));
-  return transactionRepository.createTransactions(organizationId, parsed);
+  const transactions = await transactionRepository.createTransactions(organizationId, parsed);
+
+  const sourceKind = source?.kind ?? "batch";
+  const sourceId = source?.id ?? crypto.randomUUID();
+  await dispatch(
+    "ledger/transaction.imported",
+    { organizationId, transactionIds: transactions.map((t) => t.id), sourceKind, sourceId },
+    { id: buildKey("transaction-imported", sourceKind, sourceId) },
+  ).catch(() => undefined);
+
+  return transactions;
 }
 
 /**
@@ -70,6 +94,21 @@ export async function reviewTransaction(
     reviewed: true,
     userCategory,
   });
+}
+
+/** Added for the background job platform's classification job — see
+ * repositories/transaction-repository.ts::updateClassification's comment. */
+export async function updateClassification(
+  organizationId: string,
+  id: string,
+  aiCategory: Category,
+  classificationSource: ClassificationSource,
+): Promise<Transaction> {
+  return transactionRepository.updateClassification(organizationId, id, { aiCategory, classificationSource });
+}
+
+export async function getTransactionById(organizationId: string, id: string): Promise<Transaction | undefined> {
+  return transactionRepository.getTransactionById(organizationId, id);
 }
 
 /** Mirrors lib/storage.ts::reassignMerchant. Intended to be called inside

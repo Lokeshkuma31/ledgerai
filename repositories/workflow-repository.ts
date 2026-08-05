@@ -334,6 +334,12 @@ export async function recordRun(
   organizationId: string,
   workflowKey: string,
   run: WorkflowRun,
+  /** Added for the background job platform's workflow-execute job — see
+   * prisma/schema.prisma's WorkflowRun.inngestEventId comment. A single
+   * Inngest event can match several WorkflowDefinitions for the same
+   * trigger, so callers pass `${event.id}:${workflowDefinition.id}`
+   * (globally unique per run) rather than the raw event id alone. */
+  inngestEventId?: string,
 ): Promise<void> {
   const definition = await prisma.workflowDefinition.findUniqueOrThrow({
     where: { organizationId_key: { organizationId, key: workflowKey } },
@@ -355,6 +361,7 @@ export async function recordRun(
         failedSteps: run.failedSteps,
         retryCount: run.retryCount,
         context: run.context as Prisma.InputJsonValue,
+        inngestEventId,
       },
       update: {
         status: RUN_STATUS_TO_DB[run.status],

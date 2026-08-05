@@ -18,7 +18,8 @@ import {
   toConnectionRecord,
   upsertStoredConnection,
 } from "@/lib/connections/registry";
-import { runWorkflowsForTrigger } from "@/lib/workflows/engine";
+import { dispatch } from "@/lib/jobs/dispatcher";
+import { buildKey } from "@/lib/jobs/idempotency";
 import { registerFeedContributor } from "@/lib/feed/engine";
 import { registerIndexContributor } from "@/lib/index";
 import { registerCoachImportSummaryContributor, type CoachImportSummaryContribution } from "@/lib/coach/contributors";
@@ -92,7 +93,16 @@ export async function completeConnection(input: CompleteConnectionInput): Promis
     userId: input.userId,
     existingConnectionId: input.existingConnectionId,
   });
-  await runWorkflowsForTrigger("account-connected", { connectionId: stored.id, provider: stored.provider, email: stored.email }, new Date());
+  await dispatch(
+    "ledger/workflow.trigger",
+    { trigger: "account-connected", payload: { connectionId: stored.id, provider: stored.provider, email: stored.email } },
+    { id: buildKey("workflow-trigger", "account-connected", stored.id) },
+  ).catch(() => undefined);
+  await dispatch(
+    "ledger/connection.created",
+    { connectionId: stored.id, provider: stored.provider },
+    { id: buildKey("connection-created", stored.id) },
+  ).catch(() => undefined);
   const record = toConnectionRecord(stored);
   const isReconnect = stored.history.at(-1)?.type === "reconnected";
   await recordAuditEvent({
@@ -123,7 +133,16 @@ export async function disconnectConnection(id: string, userId: string): Promise<
   await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
 
   await getProvider(existing.provider).disconnect(id);
-  await runWorkflowsForTrigger("disconnect", { connectionId: id, provider: existing.provider }, new Date());
+  // No explicit dedup id: a disconnect is a discrete user action each
+  // time, not a chatty retry — see docs/job-platform/04-queue-strategy.md
+  // §4.6 ("omit only for events where duplicate delivery is genuinely
+  // harmless"), which holds here since every downstream consumer
+  // (connection-validate, cleanup) is itself idempotent.
+  await dispatch("ledger/workflow.trigger", {
+    trigger: "disconnect",
+    payload: { connectionId: id, provider: existing.provider },
+  }).catch(() => undefined);
+  await dispatch("ledger/connection.disconnected", { connectionId: id, provider: existing.provider }).catch(() => undefined);
   await recordAuditEvent({
     action: "connection.disconnected",
     entityType: "connection",
@@ -142,7 +161,10 @@ export async function refreshConnection(id: string, userId: string): Promise<Con
 
   try {
     const updated = await getProvider(existing.provider).refreshToken(id);
-    await runWorkflowsForTrigger("connection-token-refreshed", { connectionId: id, provider: existing.provider }, new Date());
+    await dispatch("ledger/workflow.trigger", {
+      trigger: "connection-token-refreshed",
+      payload: { connectionId: id, provider: existing.provider },
+    }).catch(() => undefined);
     await recordAuditEvent({ action: "connection.token_refreshed", entityType: "connection", entityId: id, userId });
     await refreshConnectionCache();
     return toConnectionRecord(updated);
@@ -150,11 +172,10 @@ export async function refreshConnection(id: string, userId: string): Promise<Con
     const latest = (await getStoredConnection(id)) ?? existing;
     const revoked = latest.status === "permission-revoked";
     const trigger = revoked ? "connection-permission-revoked" : "connection-failed";
-    await runWorkflowsForTrigger(
+    await dispatch("ledger/workflow.trigger", {
       trigger,
-      { connectionId: id, provider: existing.provider, error: error instanceof Error ? error.message : "Unknown error" },
-      new Date(),
-    );
+      payload: { connectionId: id, provider: existing.provider, error: error instanceof Error ? error.message : "Unknown error" },
+    }).catch(() => undefined);
     await recordAuditEvent({
       action: revoked ? "connection.permission_revoked" : "connection.token_refresh_failed",
       entityType: "connection",
@@ -203,10 +224,16 @@ export async function checkAndRecordHealth(id: string, userId: string): Promise<
   await recordHealth(id, health);
 
   if (health.status === "permission-revoked") {
-    await runWorkflowsForTrigger("connection-permission-revoked", { connectionId: id, provider: existing.provider }, new Date());
+    await dispatch("ledger/workflow.trigger", {
+      trigger: "connection-permission-revoked",
+      payload: { connectionId: id, provider: existing.provider },
+    }).catch(() => undefined);
     await recordAuditEvent({ action: "connection.permission_revoked", entityType: "connection", entityId: id, userId });
   } else if (health.status === "authentication-failed") {
-    await runWorkflowsForTrigger("connection-failed", { connectionId: id, provider: existing.provider }, new Date());
+    await dispatch("ledger/workflow.trigger", {
+      trigger: "connection-failed",
+      payload: { connectionId: id, provider: existing.provider },
+    }).catch(() => undefined);
   }
   await refreshConnectionCache();
   return getConnectionRecord(id);

@@ -109,8 +109,9 @@ export async function recordRun(
   organizationId: string,
   workflowKey: string,
   run: WorkflowRun,
+  inngestEventId?: string,
 ): Promise<void> {
-  await workflowRepository.recordRun(organizationId, workflowKey, run);
+  await workflowRepository.recordRun(organizationId, workflowKey, run, inngestEventId);
   await workflowRepository.recordExecution(organizationId, workflowKey, {
     runId: run.runId,
     trigger: run.trigger,

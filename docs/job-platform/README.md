@@ -26,6 +26,7 @@ This design is grounded in direct inspection of the codebase at the current `mas
 | 6 | [Scheduling Strategy](./06-scheduling-strategy.md) | What's cron-triggered, at what cadence, and how do new schedules get registered without editing the core scheduler? |
 | 7 | [Idempotency Design](./07-idempotency-design.md) | For every job type, what guarantees repeated execution never duplicates a row? |
 | 8 | [Worker Architecture](./08-worker-architecture.md) | What actually executes a job on Vercel, what's the lifecycle, and how does scaling/recovery work given Inngest (not us) owns the queue? |
+| 9 | [Migration Plan](./09-migration-plan.md) | Which specific operation moves from which current code path to which job, and what's explicitly deferred? |
 
 ## What this design explicitly does not do
 

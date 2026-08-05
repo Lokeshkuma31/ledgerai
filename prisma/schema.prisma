@@ -49,6 +49,8 @@ model Organization {
   briefingDeliveryLogs    BriefingDeliveryLog[]
   auditLogs               AuditLog[]
   featureFlagOverrides    FeatureFlagOverride[]
+  jobRuns                 JobRun[]
+  jobDeadLetters          JobDeadLetter[]
 
   @@map("organizations")
 }
@@ -1302,4 +1304,81 @@ model BriefingDeliveryLog {
 
   @@unique([organizationId, scheduleType, date])
   @@map("briefing_delivery_logs")
+}
+
+/** lib/jobs/* — the background job platform's own lifecycle-tracking
+ * model. Distinct from SyncJob (a *business* record of "this sync ran")
+ * and WorkflowRun (a business record of "this workflow ran"): JobRun
+ * tracks the Inngest *execution* underneath any job type, including ones
+ * with no other business row of their own (cleanup, health checks). See
+ * docs/job-platform/08-worker-architecture.md §8.2. */
+enum JobStatus {
+  QUEUED
+  SCHEDULED
+  RUNNING
+  RETRYING
+  COMPLETED
+  FAILED
+  CANCELLED
+  DEAD_LETTER
+}
+
+model JobRun {
+  id             String    @id @default(cuid())
+  jobType        String
+  eventName      String
+  inngestEventId String
+  inngestRunId   String?
+  organizationId String?
+  status         JobStatus @default(QUEUED)
+  attempt        Int       @default(0)
+  progress       Int?
+  correlationId  String
+  traceId        String?
+  input          Json?
+  output         Json?
+  error          Json?
+  queuedAt       DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  durationMs     Int?
+  relatedIds     String[]  @default([])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deadLetter   JobDeadLetter?
+
+  // A single Inngest event can fan out to several subscribing functions
+  // (e.g. ledger/transaction.classified triggers both workflow-execute and
+  // feed-generate) — each gets its own execution and its own JobRun row,
+  // so the natural key is (jobType, inngestEventId), not inngestEventId
+  // alone. See docs/job-platform/08-worker-architecture.md §8.2.
+  @@unique([jobType, inngestEventId])
+  @@index([organizationId, createdAt])
+  @@index([jobType, status])
+  @@index([status, startedAt])
+  @@index([correlationId])
+  @@map("job_runs")
+}
+
+model JobDeadLetter {
+  id             String    @id @default(cuid())
+  jobRunId       String    @unique
+  jobType        String
+  organizationId String?
+  eventPayload   Json
+  error          Json
+  originalRunId  String
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  retryOfId      String?
+  createdAt      DateTime  @default(now())
+
+  jobRun       JobRun        @relation(fields: [jobRunId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, resolvedAt])
+  @@index([jobType])
+  @@map("job_dead_letters")
 }

@@ -85,12 +85,22 @@ export function checkOAuthProviders(): OAuthProviderChecks {
  * codebase yet, independent of whether its env vars happen to be set.
  * Pretending otherwise here would make this endpoint lie about the one
  * thing docs/production-readiness/01 flags as the biggest production gap. */
+/**
+ * Wired to the real job platform (lib/jobs/*, app/api/inngest/route.ts) —
+ * see docs/job-platform/. "unconfigured" now only reflects genuinely
+ * missing credentials, not the absence of a client/functions/route, which
+ * existed for every prior check in this file's history.
+ */
 export function checkBackgroundJobs(): CheckResult {
   const credentialsPresent = Boolean(process.env.INNGEST_EVENT_KEY && process.env.INNGEST_SIGNING_KEY);
+  if (!credentialsPresent) {
+    return {
+      status: "unconfigured",
+      message: "INNGEST_EVENT_KEY/INNGEST_SIGNING_KEY are not set — the job platform is wired but cannot reach Inngest.",
+    };
+  }
   return {
-    status: "unconfigured",
-    message: credentialsPresent
-      ? "Inngest credentials are set, but background job processing is not yet wired into this application."
-      : "Background job processing (Inngest) is not yet wired into this application.",
+    status: "ok",
+    message: "Inngest client, functions, and /api/inngest route are configured.",
   };
 }

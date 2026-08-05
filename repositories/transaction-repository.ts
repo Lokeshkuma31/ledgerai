@@ -164,6 +164,28 @@ export async function updateTransaction(
   return toTransaction(row);
 }
 
+/** Added for the background job platform's classification job
+ * (docs/job-platform/03-job-dependency-graph.md) — every existing
+ * creation path (createTransaction/createTransactions) already persists
+ * an already-classified row, so no update path for aiCategory/
+ * classificationSource existed until an async (re-)classification step
+ * needed one. Mirrors updateTransaction's shape exactly. */
+export async function updateClassification(
+  organizationId: string,
+  id: string,
+  patch: { aiCategory: Category; classificationSource: ClassificationSource },
+): Promise<Transaction> {
+  const aiCategoryId = await resolveCategoryId(patch.aiCategory);
+  const row = await prisma.transaction.update({
+    where: { id, organizationId },
+    data: {
+      aiCategoryId,
+      classificationSource: CLASSIFICATION_SOURCE_TO_DB[patch.classificationSource],
+    },
+  });
+  return toTransaction(row);
+}
+
 /** Repoints every transaction tagged with fromMerchantId to the merge
  * target, mirroring lib/storage.ts::reassignMerchant. Accepts an optional
  * transaction client so repositories/merchant-repository.ts can compose
