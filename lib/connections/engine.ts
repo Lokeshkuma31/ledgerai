@@ -22,6 +22,8 @@ import { runWorkflowsForTrigger } from "@/lib/workflows/engine";
 import { registerFeedContributor } from "@/lib/feed/engine";
 import { registerIndexContributor } from "@/lib/index";
 import { registerCoachImportSummaryContributor, type CoachImportSummaryContribution } from "@/lib/coach/contributors";
+import { assertOwnership } from "@/lib/auth/authorize";
+import { recordAuditEvent } from "@/lib/audit/log";
 import type { ConnectionHistoryEvent, ConnectionRecord, ProviderDescriptor, ProviderId } from "@/lib/connections/types";
 import type { FeedItem } from "@/types/feed";
 import type { IndexedObject } from "@/types/index";
@@ -61,9 +63,28 @@ export interface CompleteConnectionInput {
  * this only after verifying the callback's `state` matches the OAuth
  * session cookie it set at startConnection() time; state validation
  * itself belongs to the Route Handler, not here, since it's the one
- * holding both values. */
+ * holding both values.
+ *
+ * `existingConnectionId` (a Reconnect) is independently re-verified for
+ * ownership here — never trust that the Route Handler/cookie that
+ * produced it already checked, since this is the layer that actually
+ * handles token material (see docs/security-hardening/03-idor-verification-report.md,
+ * Finding 2, for why an unverified reconnect id is exploitable). */
 export async function completeConnection(input: CompleteConnectionInput): Promise<ConnectionRecord> {
   const provider = getProvider(input.providerId);
+
+  if (input.existingConnectionId) {
+    const existing = await getStoredConnection(input.existingConnectionId);
+    if (existing) {
+      await assertOwnership({
+        resourceUserId: existing.userId,
+        currentUserId: input.userId,
+        entityType: "connection",
+        entityId: input.existingConnectionId,
+      });
+    }
+  }
+
   const stored = await provider.connect({
     code: input.code,
     codeVerifier: input.codeVerifier,
@@ -72,46 +93,84 @@ export async function completeConnection(input: CompleteConnectionInput): Promis
     existingConnectionId: input.existingConnectionId,
   });
   await runWorkflowsForTrigger("account-connected", { connectionId: stored.id, provider: stored.provider, email: stored.email }, new Date());
+  const record = toConnectionRecord(stored);
+  const isReconnect = stored.history.at(-1)?.type === "reconnected";
+  await recordAuditEvent({
+    action: isReconnect ? "connection.reconnected" : "connection.created",
+    entityType: "connection",
+    entityId: stored.id,
+    userId: input.userId,
+    after: record,
+  });
   await refreshConnectionCache();
-  return toConnectionRecord(stored);
+  return record;
+}
+
+/** Ownership check usable by Route Handlers before they even start an
+ * OAuth round-trip (e.g. the authorize route's `?reconnect=<id>` param) —
+ * kept here rather than in registry.ts so callers never need to reach for
+ * getStoredConnection() (which carries token material) themselves. */
+export async function isConnectionOwnedBy(id: string, userId: string): Promise<boolean> {
+  const existing = await getStoredConnection(id);
+  return existing?.userId === userId;
 }
 
 // --- Disconnect / Refresh / Rename ------------------------------------------
 
-export async function disconnectConnection(id: string): Promise<ConnectionRecord | undefined> {
+export async function disconnectConnection(id: string, userId: string): Promise<ConnectionRecord | undefined> {
   const existing = await getStoredConnection(id);
   if (!existing) return undefined;
+  await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
+
   await getProvider(existing.provider).disconnect(id);
   await runWorkflowsForTrigger("disconnect", { connectionId: id, provider: existing.provider }, new Date());
+  await recordAuditEvent({
+    action: "connection.disconnected",
+    entityType: "connection",
+    entityId: id,
+    userId,
+    before: toConnectionRecord(existing),
+  });
   await refreshConnectionCache();
   return getConnectionRecord(id);
 }
 
-export async function refreshConnection(id: string): Promise<ConnectionRecord> {
+export async function refreshConnection(id: string, userId: string): Promise<ConnectionRecord> {
   const existing = await getStoredConnection(id);
   if (!existing) throw new Error(`Connection "${id}" not found.`);
+  await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
 
   try {
     const updated = await getProvider(existing.provider).refreshToken(id);
     await runWorkflowsForTrigger("connection-token-refreshed", { connectionId: id, provider: existing.provider }, new Date());
+    await recordAuditEvent({ action: "connection.token_refreshed", entityType: "connection", entityId: id, userId });
     await refreshConnectionCache();
     return toConnectionRecord(updated);
   } catch (error) {
     const latest = (await getStoredConnection(id)) ?? existing;
-    const trigger = latest.status === "permission-revoked" ? "connection-permission-revoked" : "connection-failed";
+    const revoked = latest.status === "permission-revoked";
+    const trigger = revoked ? "connection-permission-revoked" : "connection-failed";
     await runWorkflowsForTrigger(
       trigger,
       { connectionId: id, provider: existing.provider, error: error instanceof Error ? error.message : "Unknown error" },
       new Date(),
     );
+    await recordAuditEvent({
+      action: revoked ? "connection.permission_revoked" : "connection.token_refresh_failed",
+      entityType: "connection",
+      entityId: id,
+      userId,
+    });
     await refreshConnectionCache();
     throw error;
   }
 }
 
-export async function renameConnection(id: string, displayName: string): Promise<ConnectionRecord | undefined> {
+export async function renameConnection(id: string, displayName: string, userId: string): Promise<ConnectionRecord | undefined> {
   const existing = await getStoredConnection(id);
   if (!existing) return undefined;
+  await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
+
   const trimmed = displayName.trim();
   if (!trimmed) return toConnectionRecord(existing);
 
@@ -119,6 +178,14 @@ export async function renameConnection(id: string, displayName: string): Promise
   const event: ConnectionHistoryEvent = { type: "renamed", at: now, message: `Renamed to "${trimmed}".` };
   const updated = { ...existing, displayName: trimmed, lastActivity: now, history: [...existing.history, event].slice(-50) };
   await upsertStoredConnection(updated);
+  await recordAuditEvent({
+    action: "connection.renamed",
+    entityType: "connection",
+    entityId: id,
+    userId,
+    before: { displayName: existing.displayName },
+    after: { displayName: trimmed },
+  });
   await refreshConnectionCache();
   return toConnectionRecord(updated);
 }
@@ -127,15 +194,17 @@ export async function renameConnection(id: string, displayName: string): Promise
  * if near expiry, proactively refresh) the token, then persists and
  * returns the result. Fires the matching Workflow trigger when health
  * degrades to a state the spec calls out. */
-export async function checkAndRecordHealth(id: string): Promise<ConnectionRecord | undefined> {
+export async function checkAndRecordHealth(id: string, userId: string): Promise<ConnectionRecord | undefined> {
   const existing = await getStoredConnection(id);
   if (!existing) return undefined;
+  await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
 
   const health = await checkConnectionHealth(getProvider(existing.provider), existing);
   await recordHealth(id, health);
 
   if (health.status === "permission-revoked") {
     await runWorkflowsForTrigger("connection-permission-revoked", { connectionId: id, provider: existing.provider }, new Date());
+    await recordAuditEvent({ action: "connection.permission_revoked", entityType: "connection", entityId: id, userId });
   } else if (health.status === "authentication-failed") {
     await runWorkflowsForTrigger("connection-failed", { connectionId: id, provider: existing.provider }, new Date());
   }
@@ -149,8 +218,11 @@ export async function getConnections(userId: string): Promise<ConnectionRecord[]
   return getAllConnectionRecords(userId);
 }
 
-export async function getConnectionDetails(id: string): Promise<ConnectionRecord | undefined> {
-  return getConnectionRecord(id);
+export async function getConnectionDetails(id: string, userId: string): Promise<ConnectionRecord | undefined> {
+  const existing = await getStoredConnection(id);
+  if (!existing) return undefined;
+  await assertOwnership({ resourceUserId: existing.userId, currentUserId: userId, entityType: "connection", entityId: id });
+  return toConnectionRecord(existing);
 }
 
 export function getProviderDescriptors(): ProviderDescriptor[] {

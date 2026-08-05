@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { completeConnection } from "@/lib/connections/engine";
 import { readAndClearOAuthSessionCookie } from "@/lib/connections/session";
 import { getCurrentUserId } from "@/lib/auth/session";
+import { oauthCallbackRateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
+import { recordAuditEvent } from "@/lib/audit/log";
 import { PROVIDER_IDS, type ProviderId } from "@/lib/connections/types";
 
 export const runtime = "nodejs";
@@ -22,6 +25,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   const { provider } = await params;
   const url = new URL(request.url);
   const origin = url.origin;
+
+  const ip = getClientIp(request);
+  const { success } = await oauthCallbackRateLimit.limit(ip);
+  if (!success) {
+    await recordAuditEvent({ action: "security.rate_limited", entityType: "connection", entityId: ip, ip });
+    return NextResponse.redirect(new URL(`/connections?error=${encodeURIComponent("Too many requests — try again shortly.")}&provider=${provider}`, origin));
+  }
 
   const session = await readAndClearOAuthSessionCookie();
 

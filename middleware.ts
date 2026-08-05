@@ -13,44 +13,90 @@ function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`)) || pathname.startsWith("/api/connections/");
 }
 
-// General API rate limiting (plan §7) — dedicated, tighter limiters for
-// sensitive endpoints (OAuth, document upload, AI Coach chat) are future,
-// separate work; this is just the baseline every /api/* route gets.
-// Excludes /api/auth (Better Auth handles its own throttling).
+// General API rate limiting (plan §7) — the floor every /api/* route gets.
+// Dedicated, tighter limiters for sensitive endpoints (auth, OAuth,
+// document upload, Connection Hub Server Actions) are now applied directly
+// at each of those call sites (lib/cache/redis.ts's authRateLimit /
+// oauthCallbackRateLimit / uploadRateLimit / connectionMutationRateLimit)
+// rather than here — Server Actions in particular never match the
+// /api/* prefix this middleware scopes to, so they can only be rate-
+// limited at the point they're defined. See
+// docs/security-hardening/05-rate-limiting-strategy.md. /api/auth is
+// still excluded here since its own dedicated wrapper
+// (app/api/auth/[...all]/route.ts) applies authRateLimit unconditionally.
 function needsRateLimit(pathname: string): boolean {
   return pathname.startsWith("/api/") && !pathname.startsWith("/api/auth");
+}
+
+function getClientIdentifier(request: NextRequest): string {
+  const sessionToken = getSessionCookie(request);
+  if (sessionToken) return sessionToken;
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  return forwardedFor?.split(",")[0]?.trim() || "anonymous";
+}
+
+// Security response headers — applied to every response this middleware
+// produces (pass-through, rate-limit rejections, sign-in redirects) so
+// coverage is unconditional rather than route-by-route. See
+// docs/security-hardening/04-security-header-strategy.md for the
+// rationale behind each value, including why CSP still allows
+// 'unsafe-inline' for scripts (Next.js App Router RSC hydration) and why
+// Cross-Origin-Embedder-Policy is deliberately not set.
+const isProd = process.env.NODE_ENV === "production";
+
+function buildCsp(): string {
+  const scriptSrc = isProd ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'";
+  const connectSrc = isProd ? "'self'" : "'self' ws://localhost:* http://localhost:*";
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    `connect-src ${connectSrc}`,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join("; ");
+}
+
+const CSP = buildCsp();
+
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", CSP);
+  response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=()");
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  return response;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (needsRateLimit(pathname)) {
-    // Middleware can't afford a DB round-trip to resolve the real userId
-    // (see the presence-check comment above), so the session cookie's
-    // token stands in as a per-session identity key when present — closer
-    // to "userId" than a shared IP would be, without a DB call. Falls back
-    // to IP for unauthenticated requests.
-    const identifier =
-      getSessionCookie(request) ?? request.headers.get("x-forwarded-for") ?? "anonymous";
+    const identifier = getClientIdentifier(request);
     const { success } = await apiRateLimit.limit(identifier);
     if (!success) {
-      return NextResponse.json(
-        { error: { code: "RATE_LIMITED", message: "Too many requests." } },
-        { status: 429 },
+      return applySecurityHeaders(
+        NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 }),
       );
     }
   }
 
-  if (!isProtected(pathname)) return NextResponse.next();
+  if (!isProtected(pathname)) return applySecurityHeaders(NextResponse.next());
 
   const sessionToken = getSessionCookie(request);
   if (!sessionToken) {
     const signInUrl = new URL("/sign-in", request.url);
     signInUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(signInUrl);
+    return applySecurityHeaders(NextResponse.redirect(signInUrl));
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next());
 }
 
 export const config = {

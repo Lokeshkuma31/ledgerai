@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { startConnection } from "@/lib/connections/engine";
+import { isConnectionOwnedBy, startConnection } from "@/lib/connections/engine";
 import { createOAuthSessionCookie } from "@/lib/connections/session";
+import { getCurrentUserId } from "@/lib/auth/session";
+import { oauthCallbackRateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
+import { recordAuditEvent } from "@/lib/audit/log";
 import { PROVIDER_IDS, type ProviderId } from "@/lib/connections/types";
 
 // AES/GCM (token-manager.ts) and the file-backed registry (registry.ts)
@@ -22,11 +26,45 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   const { provider } = await params;
   const url = new URL(request.url);
 
+  const ip = getClientIp(request);
+  const { success } = await oauthCallbackRateLimit.limit(ip);
+  if (!success) {
+    await recordAuditEvent({ action: "security.rate_limited", entityType: "connection", entityId: ip, ip });
+    return NextResponse.redirect(new URL(`/connections?error=${encodeURIComponent("Too many requests — try again shortly.")}`, url.origin));
+  }
+
   if (!isProviderId(provider)) {
     return NextResponse.redirect(new URL("/connections?error=unknown-provider", url.origin));
   }
 
-  const reconnectId = url.searchParams.get("reconnect") ?? undefined;
+  const requestedReconnectId = url.searchParams.get("reconnect") ?? undefined;
+  let reconnectId: string | undefined;
+  if (requestedReconnectId) {
+    // A Reconnect must belong to the caller — resolved and checked here,
+    // before the id is even allowed into the short-lived OAuth session
+    // cookie, rather than trusting the callback route to catch it later
+    // (which it also independently does — see engine.ts's completeConnection).
+    // See docs/security-hardening/03-idor-verification-report.md, Finding 2.
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.redirect(new URL(`/sign-in?redirect=/connections`, url.origin));
+    }
+    const owned = await isConnectionOwnedBy(requestedReconnectId, userId);
+    if (!owned) {
+      await recordAuditEvent({
+        action: "connection.access_denied",
+        entityType: "connection",
+        entityId: requestedReconnectId,
+        userId,
+        ip,
+      });
+      return NextResponse.redirect(
+        new URL(`/connections?error=${encodeURIComponent("Connection not found.")}&provider=${provider}`, url.origin),
+      );
+    }
+    reconnectId = requestedReconnectId;
+  }
+
   const redirectUri = `${url.origin}/api/connections/${provider}/callback`;
 
   let start;

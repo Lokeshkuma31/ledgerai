@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth/better-auth";
 import { prisma } from "@/lib/db/prisma";
+import { UnauthorizedError } from "@/lib/api/errors";
 
 /** The one place Server Components/Actions/Route Handlers resolve "who is
  * signed in" — every dashboard page and the Connection Hub route
@@ -17,6 +18,16 @@ export async function getCurrentSession() {
 export async function getCurrentUserId(): Promise<string | null> {
   const session = await getCurrentSession();
   return session?.user.id ?? null;
+}
+
+/** Same as getCurrentUserId(), but throws UnauthorizedError instead of
+ * returning null — the chokepoint every Server Action/Route Handler that
+ * mutates a user-owned resource should call first, before doing anything
+ * else (see docs/security-hardening/02-authorization-audit.md). */
+export async function requireUserId(): Promise<string> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new UnauthorizedError();
+  return userId;
 }
 
 /** Every domain table (Transaction, Budget, Goal, ...) is scoped to

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentOrganizationId, getCurrentUserId } from "@/lib/auth/session";
+import { uploadRateLimit } from "@/lib/cache/redis";
+import { recordAuditEvent } from "@/lib/audit/log";
 import { getDocumentUploadUrl } from "@/services/documents/document-service";
 
 export const runtime = "nodejs";
@@ -38,6 +40,12 @@ export async function POST(request: Request) {
   const organizationId = await getCurrentOrganizationId();
   if (!userId || !organizationId) {
     return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Sign in required." } }, { status: 401 });
+  }
+
+  const { success } = await uploadRateLimit.limit(userId);
+  if (!success) {
+    await recordAuditEvent({ action: "security.rate_limited", entityType: "document", entityId: userId, userId, organizationId });
+    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests — try again shortly." } }, { status: 429 });
   }
 
   const body = await request.json().catch(() => null);

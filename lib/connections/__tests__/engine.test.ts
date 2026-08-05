@@ -14,8 +14,9 @@ process.env.MICROSOFT_OAUTH_CLIENT_SECRET = "microsoft-client-secret";
 process.env.YAHOO_OAUTH_CLIENT_ID = "yahoo-client-id";
 process.env.YAHOO_OAUTH_CLIENT_SECRET = "yahoo-client-secret";
 
-import { completeConnection, disconnectConnection, getConnections, refreshConnection, startConnection } from "@/lib/connections/engine";
+import { completeConnection, disconnectConnection, getConnections, refreshConnection, renameConnection, startConnection } from "@/lib/connections/engine";
 import { getStoredConnection } from "@/lib/connections/registry";
+import { ForbiddenError } from "@/lib/api/errors";
 import { prisma } from "@/lib/db/prisma";
 import type { ProviderId } from "@/lib/connections/types";
 
@@ -24,6 +25,9 @@ import type { ProviderId } from "@/lib/connections/types";
 // database configured in .env.local — a real User row is required to
 // satisfy Connection.userId's foreign key.
 let testUserId: string;
+// A second user, used only by the ownership/IDOR tests below — see
+// docs/security-hardening/03-idor-verification-report.md's verification plan.
+let otherUserId: string;
 
 // Real network round-trips against Neon (incl. cold-start latency) make
 // this suite slower than the 5s default per-test timeout.
@@ -32,10 +36,13 @@ vi.setConfig({ testTimeout: 20000 });
 beforeAll(async () => {
   const user = await prisma.user.create({ data: { email: `connection-hub-test-${Date.now()}@ledgerai.local`, name: "Connection Hub Test" } });
   testUserId = user.id;
+  const other = await prisma.user.create({ data: { email: `connection-hub-test-other-${Date.now()}@ledgerai.local`, name: "Connection Hub Test (Other)" } });
+  otherUserId = other.id;
 }, 20000);
 
 afterAll(async () => {
   await prisma.user.delete({ where: { id: testUserId } }).catch(() => undefined);
+  await prisma.user.delete({ where: { id: otherUserId } }).catch(() => undefined);
   await prisma.$disconnect();
 });
 
@@ -82,10 +89,10 @@ async function connectProvider(provider: ProviderId, tokenBody: Record<string, u
 
 describe("Connection Hub engine", () => {
   beforeEach(async () => {
-    // Scoped to this test's own user rather than clearConnectionRegistry()
+    // Scoped to this test's own users rather than clearConnectionRegistry()
     // (which deletes every connection for every user) — this suite runs
     // against the real dev database, not an isolated per-test store.
-    await prisma.connection.deleteMany({ where: { userId: testUserId } });
+    await prisma.connection.deleteMany({ where: { userId: { in: [testUserId, otherUserId] } } });
     vi.unstubAllGlobals();
   });
 
@@ -120,7 +127,7 @@ describe("Connection Hub engine", () => {
     );
 
     installFetchMock([{ match: (u) => u.includes("token"), response: () => jsonResponse({ access_token: "g-at-2", expires_in: 3600, token_type: "Bearer" }) }]);
-    const refreshed = await refreshConnection(record.id);
+    const refreshed = await refreshConnection(record.id, testUserId);
 
     expect(refreshed.status).toBe("connected");
     expect(refreshed.health.status).toBe("healthy");
@@ -157,7 +164,7 @@ describe("Connection Hub engine", () => {
     );
 
     installFetchMock([{ match: (u) => u.includes("token"), response: () => jsonResponse({ error: "invalid_grant" }, 400) }]);
-    await expect(refreshConnection(record.id)).rejects.toThrow();
+    await expect(refreshConnection(record.id, testUserId)).rejects.toThrow();
 
     const stored = (await getStoredConnection(record.id))!;
     expect(stored.status).toBe("permission-revoked");
@@ -217,11 +224,89 @@ describe("Connection Hub engine", () => {
     );
 
     installFetchMock([{ match: (u) => u.includes("revoke"), response: () => jsonResponse({}) }]);
-    const disconnected = await disconnectConnection(record.id);
+    const disconnected = await disconnectConnection(record.id, testUserId);
 
     expect(disconnected?.status).toBe("disconnected");
     expect(disconnected?.health.status).toBe("disconnected");
     const stored = (await getStoredConnection(record.id))!;
     expect(stored.tokens).toBeNull();
+  });
+
+  describe("Ownership enforcement (IDOR regression coverage)", () => {
+    // See docs/security-hardening/03-idor-verification-report.md, Finding 1:
+    // disconnect/refresh/rename/health-check previously took a bare
+    // connection id with no check that it belonged to the caller.
+
+    it("disconnectConnection rejects a caller who doesn't own the connection", async () => {
+      const record = await connectProvider(
+        "google",
+        { access_token: "g-at-1", refresh_token: "g-rt-1", expires_in: 3600, token_type: "Bearer" },
+        { sub: "google-uid-1", email: "person@gmail.com", name: "Person" },
+      );
+
+      await expect(disconnectConnection(record.id, otherUserId)).rejects.toBeInstanceOf(ForbiddenError);
+
+      // Untouched — still connected, still owned by the original user.
+      const stored = (await getStoredConnection(record.id))!;
+      expect(stored.status).toBe("connected");
+      expect(stored.userId).toBe(testUserId);
+    });
+
+    it("refreshConnection rejects a caller who doesn't own the connection", async () => {
+      const record = await connectProvider(
+        "google",
+        { access_token: "g-at-1", refresh_token: "g-rt-1", expires_in: 3600, token_type: "Bearer" },
+        { sub: "google-uid-1", email: "person@gmail.com", name: "Person" },
+      );
+
+      await expect(refreshConnection(record.id, otherUserId)).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("renameConnection rejects a caller who doesn't own the connection", async () => {
+      const record = await connectProvider(
+        "google",
+        { access_token: "g-at-1", refresh_token: "g-rt-1", expires_in: 3600, token_type: "Bearer" },
+        { sub: "google-uid-1", email: "person@gmail.com", name: "Person" },
+      );
+
+      await expect(renameConnection(record.id, "Hijacked", otherUserId)).rejects.toBeInstanceOf(ForbiddenError);
+
+      const stored = (await getStoredConnection(record.id))!;
+      expect(stored.displayName).not.toBe("Hijacked");
+    });
+
+    it("completeConnection rejects reconnecting to a connection id owned by a different user", async () => {
+      const victim = await connectProvider(
+        "google",
+        { access_token: "g-at-1", refresh_token: "g-rt-1", expires_in: 3600, token_type: "Bearer" },
+        { sub: "google-uid-victim", email: "victim@gmail.com", name: "Victim" },
+      );
+
+      installFetchMock(
+        tokenAndUserInfoRoutes(
+          { access_token: "attacker-at", refresh_token: "attacker-rt", expires_in: 3600, token_type: "Bearer" },
+          200,
+          { sub: "google-uid-attacker", email: "attacker@gmail.com", name: "Attacker" },
+        ),
+      );
+      const start = startConnection("google", "https://app.example/api/connections/google/callback");
+
+      await expect(
+        completeConnection({
+          providerId: "google",
+          code: "attacker-auth-code",
+          codeVerifier: start.codeVerifier,
+          redirectUri: "https://app.example/api/connections/google/callback",
+          userId: otherUserId,
+          existingConnectionId: victim.id,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+
+      // The victim's connection must be completely untouched — still their
+      // own tokens/email/ownership, not overwritten by the attacker's.
+      const stored = (await getStoredConnection(victim.id))!;
+      expect(stored.userId).toBe(testUserId);
+      expect(stored.email).toBe("victim@gmail.com");
+    });
   });
 });

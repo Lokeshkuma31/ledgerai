@@ -3,6 +3,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/db/prisma";
 import { BUILT_IN_WORKFLOWS } from "@/lib/workflows/built-in-workflows";
+import { recordAuditEvent } from "@/lib/audit/log";
 
 // Better Auth is exclusively user identity/login. It is intentionally kept
 // separate from the Connection Hub (lib/connections/*), which is OAuth for
@@ -53,6 +54,15 @@ export const auth = betterAuth({
   // seeded here too — that module's own doc comment already documents
   // this as the real sign-up path (prisma/seed.ts's seedBuiltInWorkflows
   // only covers the dev/preview demo org, not real sign-ups).
+  // Audit logging (docs/security-hardening/06-audit-logging-design.md):
+  // user.create.after and session.create.after are the two hook points
+  // Better Auth exposes that map to this app's "authentication" event
+  // category — a real sign-up and a real sign-in, respectively. There is
+  // no corresponding "failed login" hook exposed by this version of
+  // Better Auth to hook into directly; failed-auth signal is instead
+  // captured indirectly via the auth route's rate limiter (see
+  // app/api/auth/[...all]/route.ts) recording security.rate_limited on
+  // repeated failures.
   databaseHooks: {
     user: {
       create: {
@@ -81,6 +91,26 @@ export const auth = betterAuth({
               }),
             ),
           );
+          await recordAuditEvent({
+            action: "auth.user.registered",
+            entityType: "user",
+            entityId: user.id,
+            userId: user.id,
+            organizationId: organization.id,
+          });
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          await recordAuditEvent({
+            action: "auth.session.created",
+            entityType: "session",
+            entityId: session.id,
+            userId: session.userId,
+            ip: session.ipAddress ?? null,
+          });
         },
       },
     },
