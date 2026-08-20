@@ -25,6 +25,7 @@ import { getAllSyncJobs, getLatestSyncJob, getSyncJobById, getSyncJobsByProvider
 import { syncQueue, type EnqueueOptions } from "@/lib/sync/queue";
 import { getAllSyncProviders, getSyncProvider } from "@/lib/sync/registry";
 import { getProvidersDueForSync } from "@/lib/sync/scheduler";
+import { isProviderSyncEnabled } from "@/lib/flags";
 import type {
   SyncEngineHealth,
   SyncExecutionInput,
@@ -165,6 +166,7 @@ function enqueueAndStart(provider: SyncProvider, options: EnqueueOptions): SyncJ
  * anything if that provider already has an active (queued or running) job
  * — "Prevent duplicate jobs" from the spec. */
 export function startSync(providerId: string, type: SyncJobType = "manual"): SyncJob | undefined {
+  if (!isProviderSyncEnabled()) throw new Error("Provider sync is temporarily disabled.");
   const provider = getSyncProvider(providerId);
   if (!provider) throw new Error(`Sync provider "${providerId}" is not registered.`);
   return enqueueAndStart(provider, { type });
@@ -174,6 +176,7 @@ export function startSync(providerId: string, type: SyncJobType = "manual"): Syn
  * the dashboard (or a test) on whatever cadence it chooses; this engine
  * runs no timer of its own (see the milestone's "Do NOT Add" list). */
 export function runScheduledSyncs(now: Date = new Date()): SyncJob[] {
+  if (!isProviderSyncEnabled()) return [];
   const lastRunAtByProvider: Record<string, string | null> = {};
   for (const provider of getAllSyncProviders()) {
     lastRunAtByProvider[provider.id] = getLatestSyncJob(provider.id)?.completedAt ?? null;

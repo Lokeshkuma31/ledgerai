@@ -17,6 +17,7 @@
 import { ingestTransaction } from "@/lib/ingestion/pipeline";
 import { addTransactions } from "@/lib/storage";
 import { runWorkflowsForTrigger } from "@/lib/workflows/engine";
+import { isProviderSyncEnabled } from "@/lib/flags";
 import { registerFeedContributor } from "@/lib/feed/engine";
 import { registerIndexContributor } from "@/lib/index";
 import { registerCoachAccountSummaryContributor, type BankCoachAccountSummary } from "@/lib/coach/contributors";
@@ -163,6 +164,9 @@ interface PendingIngest {
  * is a core-storage change outside this milestone's scope.
  */
 export async function runSync(connectorId: string, syncType: SyncType): Promise<SyncRun> {
+  if (!isProviderSyncEnabled()) {
+    throw new Error("Provider sync is temporarily disabled.");
+  }
   if (!isConnectorEnabled(connectorId)) {
     throw new Error(`Connector "${connectorId}" is disabled. Enable it before syncing.`);
   }

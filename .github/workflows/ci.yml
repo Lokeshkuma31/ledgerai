@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=-1
+
+      - name: Unit tests
+        run: npm run test -- --run
+
+      # Requires an ephemeral Neon branch created for this PR — see the Neon
+      # GitHub integration (or the neondatabase/create-branch-action) in
+      # docs/production-readiness-v2/02-deployment-architecture.md. Falls
+      # back to PREVIEW_DATABASE_URL if branch-per-PR isn't wired up yet.
+      - name: Prisma migrate diff (schema drift check)
+        if: ${{ vars.NEON_BRANCH_PER_PR == 'true' || secrets.PREVIEW_DATABASE_URL != '' }}
+        run: npx prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --exit-code
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DIRECT_DATABASE_URL || secrets.PREVIEW_DATABASE_URL }}
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build does not require live external services (verified: routes
+          # are dynamic, not statically prerendered against the DB) — a
+          # syntactically valid placeholder is sufficient here. Real secrets
+          # are only required for the production deploy workflow.
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL || 'postgresql://ci:ci@localhost:5432/ci' }}
+
+      # Hard-blocks only on critical severity. As of 2026-08-06 there are 6
+      # known high-severity findings (postcss/sharp, transitive via next@^15)
+      # whose only fix is `npm audit fix --force`, which forces a Next.js
+      # major-version bump — out of scope for this pass per AGENTS.md (this
+      # repo runs a customized, breaking-change Next.js build). Tracked as an
+      # accepted-risk exception in
+      # docs/production-readiness-v2/04-security-verification-report.md;
+      # revisit when the Next.js upgrade is separately planned.
+      - name: Dependency audit (critical)
+        run: npm audit --production --audit-level=critical
+      - name: Dependency audit (high — informational, non-blocking)
+        run: npm audit --production --audit-level=high || echo "::warning::High-severity findings present — see docs/production-readiness-v2/04-security-verification-report.md for the tracked exception"
+
+  e2e:
+    runs-on: ubuntu-latest
+    # Same PR-database precondition as the migrate-diff step above — signup
+    # writes real rows (user/org/membership/workflows), so this needs an
+    # actual reachable Postgres, not the placeholder used for the plain build.
+    if: ${{ vars.NEON_BRANCH_PER_PR == 'true' || secrets.PREVIEW_DATABASE_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run production migrations against the preview database
+        run: npx prisma migrate deploy
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.PREVIEW_DIRECT_DATABASE_URL || secrets.PREVIEW_DATABASE_URL }}
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+
+      - name: E2E golden path
+        run: npm run test:e2e
+        env:
+          CI: true
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.PREVIEW_BETTER_AUTH_SECRET }}
+          BETTER_AUTH_URL: http://localhost:3000
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

@@ -34,6 +34,7 @@ import {
   startSync,
 } from "@/lib/sync/engine";
 import type { SyncEngineHealth, SyncJob, SyncProvider, SyncQueueSnapshot, SyncScheduleFrequency } from "@/lib/sync/types";
+import { isProviderSyncEnabled } from "@/lib/flags";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -46,6 +47,7 @@ const POLL_INTERVAL_MS = 2000;
  * section asks for (Manual Sync Buttons, Schedule Settings).
  */
 export default function SyncDashboard() {
+  const syncEnabled = isProviderSyncEnabled();
   const [providers, setProviders] = useState<SyncProvider[]>([]);
   const [queue, setQueue] = useState<SyncQueueSnapshot>({ queued: [], running: [], concurrencyLimit: 2 });
   const [health, setHealth] = useState<SyncEngineHealth | null>(null);
@@ -74,6 +76,7 @@ export default function SyncDashboard() {
   }, [refresh]);
 
   async function handleStart(provider: SyncProvider) {
+    if (!syncEnabled) return;
     setStartingIds((prev) => new Set(prev).add(provider.id));
     try {
       startSync(provider.id, "manual");
@@ -125,12 +128,20 @@ export default function SyncDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
+      {!syncEnabled && (
+        <Card role="status" className="border-amber-500/50 bg-amber-500/10">
+          <CardContent className="py-3 text-sm text-amber-700 dark:text-amber-300">
+            Provider sync is temporarily disabled. Existing data is unaffected — this only pauses new syncs.
+          </CardContent>
+        </Card>
+      )}
+
       {health && <ProviderHealthTable health={health} />}
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">Providers</h2>
-          <Button variant="outline" size="xs" onClick={handleRunScheduled}>
+          <Button variant="outline" size="xs" onClick={handleRunScheduled} disabled={!syncEnabled}>
             Run Due Schedules
           </Button>
         </div>

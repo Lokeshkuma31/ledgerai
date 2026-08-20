@@ -8,8 +8,9 @@ import type { CurrentUserResponse } from "@/app/api/me/route";
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: ReactNode }) =>
-    createElement(QueryClientProvider, { client: queryClient }, children);
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: queryClient }, children);
+  };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

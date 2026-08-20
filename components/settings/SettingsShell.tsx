@@ -7,6 +7,7 @@ import {
   Database,
   FileClock,
   Link2,
+  LifeBuoy,
   Lock,
   Palette,
   Plug,
@@ -24,6 +25,7 @@ import ConnectionsSettingsCard from "@/components/settings/ConnectionsSettingsCa
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import ProfileSettings from "@/components/settings/ProfileSettings";
 import SecuritySettings from "@/components/settings/SecuritySettings";
+import SupportSettings from "@/components/settings/SupportSettings";
 import { Input } from "@/components/ui/input";
 import type { AIProviderSummary } from "@/lib/ai/config";
 import type { ConnectionRecord } from "@/lib/connections/types";
@@ -40,6 +42,7 @@ const SECTIONS = [
   { id: "imports", label: "Imports", icon: FileClock },
   { id: "plugins", label: "Plugins", icon: Plug },
   { id: "advanced", label: "Advanced", icon: Database },
+  { id: "support", label: "Support", icon: LifeBuoy },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -149,6 +152,7 @@ export default function SettingsShell({
             <MemoryManager />
           </div>
         )}
+        {active === "support" && <SupportSettings />}
       </div>
     </div>
   );

@@ -84,7 +84,10 @@
 :root {
   --background: #f4f6fb;
   --foreground: #0b1220;
-  --foreground-subtle: #94a3b8;
+  /* Was #94a3b8 (slate-400) — ~2.4:1 against this background, well under
+     WCAG AA's 4.5:1 text minimum. Matched to --muted-foreground's value
+     (~7:1) rather than picking a new token. */
+  --foreground-subtle: #475569;
   --card: #ffffff;
   --card-foreground: #0b1220;
   --surface-2: #f1f5f9;
@@ -175,5 +178,21 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* hooks/use-reduced-motion.ts covers a handful of components explicitly
+   (AnimatedCounter, StatusDot); this is the blanket fallback for the ~39
+   other unconditional transition-*/animate-* usages across the app —
+   WCAG 2.3.3. Near-zero duration rather than `none` so JS that waits on
+   transitionend/animationend still fires. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

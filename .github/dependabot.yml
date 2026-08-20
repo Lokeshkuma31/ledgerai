@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Batch low-risk patch/minor bumps into one PR per week instead of
+      # dozens of individual ones. Major bumps (e.g. the eventual next@16
+      # upgrade tracked in docs/production-readiness-v2/04-security-verification-report.md)
+      # are deliberately excluded from grouping so they surface as their own
+      # reviewable PR, not silently swept in.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # next/react/react-dom major bumps must stay a deliberate, reviewed
+      # decision per AGENTS.md (this repo runs a customized, breaking-change
+      # Next.js build) — not something Dependabot should propose automatically.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

@@ -11,6 +11,7 @@
 import { defineJob } from "@/lib/jobs/worker";
 import { dispatch } from "@/lib/jobs/dispatcher";
 import { buildKey } from "@/lib/jobs/idempotency";
+import { isProviderSyncEnabled } from "@/lib/flags";
 import { mutex, globalConcurrency } from "@/lib/jobs/queue";
 import * as syncJobService from "@/services/sync/sync-job-service";
 import { capture } from "@/lib/observability/analytics";
@@ -27,6 +28,7 @@ export const syncStart = defineJob<EventPayload<"ledger/connection.created">>(
   },
   async ({ event, organizationId, correlationId }) => {
     if (!organizationId) return { skipped: true };
+    if (!isProviderSyncEnabled()) return { skipped: true, reason: "provider_sync_disabled" };
     const { connectionId, provider } = event.data;
 
     await dispatch(
@@ -57,6 +59,7 @@ export const syncRun = defineJob<EventPayload<"ledger/sync.started">>(
   },
   async ({ event, organizationId, correlationId, step }) => {
     if (!organizationId) return { skipped: true };
+    if (!isProviderSyncEnabled()) return { skipped: true, reason: "provider_sync_disabled" };
     const { providerId, providerCategory, connectionId } = event.data;
 
     // Layer-2 idempotency backstop alongside the concurrency mutex above

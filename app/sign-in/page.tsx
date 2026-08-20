@@ -94,10 +94,21 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4">
       <Suspense fallback={<Card className="w-full max-w-sm animate-pulse" style={{ height: 360 }} />}>
         <SignInForm />
       </Suspense>
+      <p className="text-xs text-muted-foreground">
+        By continuing you agree to our{" "}
+        <a href="/legal/terms" className="underline underline-offset-4">
+          Terms
+        </a>{" "}
+        and{" "}
+        <a href="/legal/privacy" className="underline underline-offset-4">
+          Privacy Policy
+        </a>
+        .
+      </p>
     </div>
   );
 }

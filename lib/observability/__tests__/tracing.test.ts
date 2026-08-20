@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROOT_CONTEXT, SpanKind } from "@opentelemetry/api";
+import { ROOT_CONTEXT, SpanKind, type Link } from "@opentelemetry/api";
 import { SamplingDecision } from "@opentelemetry/sdk-trace-base";
 import { withSpan, withActionSpan, withJobSpan, LedgerSampler } from "@/lib/observability/tracing";
 
@@ -44,7 +44,8 @@ describe("LedgerSampler", () => {
   // all-zero trace id as invalid, which short-circuits samplers to
   // NOT_RECORD regardless of ratio, so it can't be used as a stand-in
   // "arbitrary" trace id here.
-  const args = (name: string) => [ROOT_CONTEXT, "4bf92f3577b34da6a3ce929d0e0e4736", name, SpanKind.INTERNAL, {}, []] as const;
+  const args = (name: string) =>
+    [ROOT_CONTEXT, "4bf92f3577b34da6a3ce929d0e0e4736", name, SpanKind.INTERNAL, {}, [] as Link[]] as const;
 
   it("always samples job./oauth./action. spans regardless of the configured ratio", () => {
     const sampler = new LedgerSampler(0);

@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LedgerAI
 
-## Getting Started
+**AI-assisted personal finance platform** — connects bank/email accounts, syncs and categorizes transactions, and surfaces spending insights, budgets, and forecasts through an AI coach.
 
-First, run the development server:
+Built as a production-shaped Next.js app: real auth, background job processing, observability, and a documented deployment/incident-response process — not just a CRUD demo.
+
+> **Deploying or rolling back?** See [`DEPLOYMENT.md`](./DEPLOYMENT.md). Full production-readiness docs (security, DR, runbooks, launch checklist) live in [`docs/production-readiness-v2/`](./docs/production-readiness-v2/README.md).
+
+## Features
+
+- **Account syncing** — connects banks and email providers (Gmail, Outlook, Yahoo) via a Connection Hub, with an async, retryable sync pipeline
+- **Transactions & budgets** — categorization, recurring-transaction detection, merchant normalization, budgets and goals
+- **AI Coach** — conversational insights over a user's own financial data
+- **Analytics & forecasting** — spend trends, category breakdowns, cash-flow forecasts
+- **Document handling** — statement/receipt upload with OCR extraction
+- **Feature-flag kill switch** — provider sync can be disabled instantly in production without a deploy
+
+## Tech stack
+
+| Layer | Choices |
+|---|---|
+| Framework | Next.js 15 (App Router), React 19, TypeScript |
+| UI | Tailwind CSS v4, shadcn/ui, Base UI, Recharts |
+| Data | PostgreSQL (Neon, serverless driver), Prisma ORM |
+| Auth | better-auth |
+| Background jobs | Inngest (event-driven, retryable) |
+| Caching / rate limiting | Upstash Redis |
+| Storage | Cloudflare R2 (S3-compatible) |
+| AI | Anthropic SDK |
+| Observability | OpenTelemetry, Sentry, Pino structured logging, PostHog analytics |
+| Testing | Vitest (unit), Playwright (e2e) |
+| CI/CD | GitHub Actions → Vercel |
+
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in your own provider/DB credentials
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Useful scripts:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm run test        # vitest unit tests
+npm run test:e2e    # playwright e2e
+npm run build        # production build
+```
 
-## Learn More
+## Architecture notes
 
-To learn more about Next.js, take a look at the following resources:
+- **`app/`** — route groups split into `(admin)`, `(app)` (the authenticated product surface: dashboard, transactions, budgets, banks, insights, forecast, AI coach, workflows, settings, …), and `api/` (auth, connections, documents, health/liveness/readiness, Inngest webhook)
+- **`lib/`** — sync engine, bank integrations, background job definitions, feature flags, observability plumbing, support utilities
+- **`prisma/`** — schema and migrations
+- **`e2e/`** — Playwright golden-path coverage
+- **`docs/production-readiness-v2/`** — security review, disaster-recovery plan, performance report, operational runbook, and launch checklist written for this project
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project has a full production-readiness pass on the code side (CI/CD workflows, feature-flag kill switch, structured observability, an accessibility pass, e2e coverage). Remaining items are tracked transparently in [`docs/production-readiness-v2/00-progress.md`](./docs/production-readiness-v2/00-progress.md) and are mostly external (provider dashboard access, secrets, legal review) rather than outstanding engineering work.
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private project, shared for portfolio/demonstration purposes.

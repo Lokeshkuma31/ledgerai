@@ -1,0 +1,68 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=-1
+
+      - name: Unit tests
+        run: npm run test -- --run
+
+      - name: Dependency audit (critical)
+        run: npm audit --production --audit-level=critical
+
+      # Runs against the unpooled connection per prisma.config.ts — the
+      # pooled/pgbouncer endpoint silently swallows writes to the
+      # _prisma_migrations tracking table. Must complete before the new
+      # deployment goes live so the running app version never sees a
+      # half-migrated schema.
+      - name: Run production migrations
+        run: npx prisma migrate deploy
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.PROD_DIRECT_DATABASE_URL }}
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel production environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build for production
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt output to production
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Post-deploy health check
+        run: |
+          sleep 15
+          curl -sf "${{ steps.deploy.outputs.deployment_url }}/api/health" || {
+            echo "::error::Health check failed after deploy — see docs/production-readiness-v2/06-operational-runbook.md#runbook-rollback";
+            exit 1;
+          }

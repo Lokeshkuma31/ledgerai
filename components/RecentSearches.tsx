@@ -47,11 +47,16 @@ export default function RecentSearches({
               {search.query || "(filters only)"}
             </button>
             <span className="text-muted-foreground text-xs">{search.resultCount} results</span>
-            <Button variant="ghost" size="icon-xs" onClick={() => onTogglePin(search.id)}>
-              {search.pinned ? "★" : "☆"}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => onTogglePin(search.id)}
+              aria-label={search.pinned ? "Unpin search" : "Pin search"}
+            >
+              <span aria-hidden="true">{search.pinned ? "★" : "☆"}</span>
             </Button>
-            <Button variant="ghost" size="icon-xs" onClick={() => onDelete(search.id)}>
-              ✕
+            <Button variant="ghost" size="icon-xs" onClick={() => onDelete(search.id)} aria-label="Delete search">
+              <span aria-hidden="true">✕</span>
             </Button>
           </div>
         ))}

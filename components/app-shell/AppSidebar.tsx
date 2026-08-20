@@ -39,7 +39,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" aria-label="Main navigation" role="navigation">
       <SidebarHeader>
         <div className="flex items-center gap-3 px-2 py-1.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai font-heading text-sm font-bold text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.7)]">
