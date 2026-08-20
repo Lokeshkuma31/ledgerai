@@ -1,0 +1,32 @@
+# LedgerAI
+
+> LedgerAI is an AI-native personal finance copilot. It connects a user's
+> banks and email inbox, automatically syncs and categorizes every
+> transaction, and turns that data into budgets, cash-flow forecasts, and a
+> conversational AI coach that can answer questions about a user's own
+> spending.
+
+LedgerAI is a solo/portfolio project, open source, built with Next.js 15,
+React 19, Prisma + Neon Postgres, Inngest for background jobs, and the
+Anthropic Claude API for the AI coach. It is not a company or a commercial
+product — it is a working demonstration of a production-shaped fintech
+application (CI/CD, observability, security hardening, documented
+deployment/incident-response process).
+
+## Core features
+
+- Bank and email account syncing (Gmail, Outlook, Yahoo) via an async,
+  retryable background job pipeline
+- Automatic transaction categorization and merchant normalization
+- Budgets, goals, and recurring-transaction detection
+- Cash-flow forecasting
+- An AI coach that answers natural-language questions about the user's own
+  transaction history
+- Document/receipt upload with OCR extraction
+
+## Links
+
+- Source code: https://github.com/Lokeshkuma31/ledgerai
+- Live app: https://ledgerai-ivory.vercel.app
+- Privacy policy: https://ledgerai-ivory.vercel.app/legal/privacy
+- Terms: https://ledgerai-ivory.vercel.app/legal/terms

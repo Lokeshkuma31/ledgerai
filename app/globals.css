@@ -181,6 +181,38 @@
   }
 }
 
+/* Landing page tech-stack marquee (app/page.tsx). Two identical <ul>s
+   scroll as one continuous belt; the blanket prefers-reduced-motion rule
+   below collapses the 40s duration to near-zero, which freezes rather
+   than removes it — acceptable since the list is still fully readable. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+/* Hero background glow orbs (app/page.tsx) — slow breathing effect. */
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
+
 /* hooks/use-reduced-motion.ts covers a handful of components explicitly
    (AnimatedCounter, StatusDot); this is the blanket fallback for the ~39
    other unconditional transition-*/animate-* usages across the app —

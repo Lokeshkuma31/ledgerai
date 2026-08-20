@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,8 +28,35 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LedgerAI",
-  description: "Your personal AI financial copilot.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Your AI-native personal finance copilot`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "personal finance app",
+    "AI finance copilot",
+    "budgeting app",
+    "transaction categorization",
+    "cash flow forecast",
+    "bank sync",
+    "AI money coach",
+  ],
+  authors: [{ name: "Lokesh Kumar", url: "https://github.com/Lokeshkuma31" }],
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Your AI-native personal finance copilot`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — Your AI-native personal finance copilot`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
