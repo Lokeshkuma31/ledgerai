@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy — LedgerAI",
 };
 
-const LAST_UPDATED = "2026-08-06";
+const LAST_UPDATED = "2026-08-25";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -43,9 +43,20 @@ export default function PrivacyPolicyPage() {
 
       <h2>Your rights</h2>
       <p>
-        You can request an export of your data or deletion of your account by contacting support (see the Support
-        section of your account settings). We aim to fulfill export/deletion requests within a reasonable window —
-        the exact SLA will be finalized during legal review.
+        You can export a copy of your transactions, budgets, goals, recurring rules, bank accounts, and AI Coach
+        conversation history, or permanently delete your account, at any time from Settings → Privacy — both are
+        immediate, self-service actions, not a support request. Deleting your account removes your organization and
+        every transaction, budget, goal, connection, and document tied to it; this cannot be undone.
+      </p>
+      <p>
+        If you are in India, these correspond to your rights as a Data Principal under the Digital Personal Data
+        Protection Act, 2023 (DPDPA) — access, correction, and erasure of your personal data. If you believe your
+        data has been processed unlawfully, you may reach our Grievance Officer using the contact details below
+        before approaching the Data Protection Board of India.
+      </p>
+      <p>
+        LedgerAI is intended for users aged 18 and over. We do not knowingly collect personal data from minors; if
+        you believe a minor has created an account, contact us and we will delete it.
       </p>
 
       <h2>Security</h2>
@@ -54,11 +65,24 @@ export default function PrivacyPolicyPage() {
         <a href="/legal/security" className="underline underline-offset-4">
           Security Policy
         </a>{" "}
-        for more detail, if published, or contact support.
+        for more detail.
       </p>
 
-      <h2>Contact</h2>
-      <p>Questions about this policy: contact details to be added during legal review.</p>
+      <h2>Grievance Officer / Contact</h2>
+      <p>
+        For privacy questions, data-rights requests not covered by the self-service tools above, or grievances
+        under the DPDPA: open an issue at{" "}
+        <a
+          href="https://github.com/Lokeshkuma31/ledgerai/issues"
+          className="underline underline-offset-4"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          github.com/Lokeshkuma31/ledgerai/issues
+        </a>
+        , the fastest route to the developer for this solo-built project. A dedicated grievance-officer email will
+        be published here before any wider/commercial launch.
+      </p>
     </>
   );
 }

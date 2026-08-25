@@ -157,13 +157,13 @@ export default function Home() {
               className="mb-6 h-auto rounded-full border border-ai/30 px-3 py-1 shadow-[0_0_24px_-8px_var(--ai)]"
             >
               <Sparkles className="size-3" />
-              Built solo, powered by Claude
+              Your AI money coach, powered by Claude
             </Badge>
 
             <h1 className="font-heading text-5xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl md:text-7xl lg:text-8xl">
               Your money,
               <br />
-              <span className="bg-gradient-to-r from-primary via-ai to-primary bg-clip-text text-transparent drop-shadow-[0_0_60px_rgba(124,58,237,0.35)]">
+              <span className="bg-gradient-to-r from-primary via-ai to-primary bg-clip-text text-transparent drop-shadow-[0_0_60px_rgba(194,65,12,0.4)]">
                 finally understood.
               </span>
             </h1>
@@ -252,7 +252,7 @@ export default function Home() {
             {FEATURES.map((feature) => (
               <div
                 key={feature.id}
-                className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_16px_40px_-24px_rgba(37,99,235,0.35)] ${feature.span ?? ""}`}
+                className={`group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_16px_40px_-24px_rgba(194,65,12,0.35)] ${feature.span ?? ""}`}
               >
                 <div
                   className={`mb-4 flex size-10 items-center justify-center rounded-xl ${ACCENT_CLASSES[feature.accent]}`}
@@ -297,26 +297,20 @@ export default function Home() {
           <div className="flex flex-col items-center gap-8 rounded-3xl border border-border bg-gradient-to-br from-card to-surface-2 p-8 text-center sm:p-14">
             <Landmark className="size-8 text-primary" />
             <h2 className="max-w-xl font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-              Built like a production app, run as a portfolio project.
+              Built with the same rigor as a production fintech app.
             </h2>
             <p className="max-w-lg text-sm text-foreground-subtle">
-              Real background job processing, structured logging and tracing, CI/CD, and a
-              documented deployment and incident-response process — the same shape as a
-              production fintech app, built to learn how one actually holds together.
+              Encrypted connections, structured monitoring, rate-limited APIs, and a
+              documented incident-response process — because your bank and email data
+              deserve more than a weekend hack.
             </p>
             <Button
               size="lg"
               className="h-11 px-6 text-sm"
               nativeButton={false}
-              render={
-                <a
-                  href="https://github.com/Lokeshkuma31/ledgerai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                />
-              }
+              render={<Link href="/legal/security" />}
             >
-              Explore the code
+              Read our security practices
               <ArrowRight />
             </Button>
           </div>

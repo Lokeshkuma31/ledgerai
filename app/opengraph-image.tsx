@@ -16,8 +16,8 @@ export default async function Image() {
           flexDirection: "column",
           justifyContent: "center",
           padding: "80px",
-          background: "linear-gradient(135deg, #0b1220 0%, #101a34 60%, #0b1220 100%)",
-          color: "#f8fafc",
+          background: "linear-gradient(135deg, #17130f 0%, #201a14 60%, #17130f 100%)",
+          color: "#f5f1ea",
           fontFamily: "sans-serif",
         }}
       >
@@ -35,7 +35,7 @@ export default async function Image() {
               width: 64,
               height: 64,
               borderRadius: 16,
-              background: "linear-gradient(135deg, #2563eb, #7c3aed)",
+              background: "linear-gradient(135deg, #d97706, #0f766e)",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 32,
@@ -55,14 +55,14 @@ export default async function Image() {
             fontSize: 64,
             fontWeight: 800,
             lineHeight: 1.1,
-            backgroundImage: "linear-gradient(90deg, #3b82f6, #7c3aed)",
+            backgroundImage: "linear-gradient(90deg, #d97706, #0f766e)",
             backgroundClip: "text",
             color: "transparent",
           }}
         >
           finally understood.
         </div>
-        <div style={{ display: "flex", marginTop: 32, fontSize: 24, color: "#94a3b8", maxWidth: 820 }}>
+        <div style={{ display: "flex", marginTop: 32, fontSize: 24, color: "#a8a29e", maxWidth: 820 }}>
           {SITE_DESCRIPTION.split(" — ")[0]}
         </div>
       </div>

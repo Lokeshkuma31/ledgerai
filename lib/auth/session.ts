@@ -2,7 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth/better-auth";
 import { prisma } from "@/lib/db/prisma";
-import { UnauthorizedError } from "@/lib/api/errors";
+import { ForbiddenError, UnauthorizedError } from "@/lib/api/errors";
 
 /** The one place Server Components/Actions/Route Handlers resolve "who is
  * signed in" — every dashboard page and the Connection Hub route
@@ -66,4 +66,26 @@ export async function getCurrentMembership(): Promise<CurrentMembership | null> 
     organizationName: membership.organization.name,
     role: membership.role,
   };
+}
+
+/**
+ * The server-side counterpart to hooks/auth/use-role-check.ts, which only
+ * hides/shows UI — it never blocked a request. Every user is auto-
+ * provisioned as OWNER of their own solo organization today, so no route
+ * currently *needs* this to behave correctly; it exists so that the first
+ * mutation gated to ADMIN/OWNER (once real team membership ships) has a
+ * ready chokepoint instead of ad hoc role checks scattered across Route
+ * Handlers/Server Actions. Throws ForbiddenError (403), not
+ * UnauthorizedError (401) — the caller is authenticated, just not
+ * permitted.
+ */
+export async function requireRole(
+  allowed: CurrentMembership["role"][],
+): Promise<CurrentMembership> {
+  const membership = await getCurrentMembership();
+  if (!membership) throw new UnauthorizedError();
+  if (!allowed.includes(membership.role)) {
+    throw new ForbiddenError(`This action requires one of: ${allowed.join(", ")}.`);
+  }
+  return membership;
 }

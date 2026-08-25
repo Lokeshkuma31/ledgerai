@@ -13,7 +13,7 @@ export function MarketingNav() {
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/70 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5" aria-label="LedgerAI home">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai font-heading text-sm font-bold text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.7)]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-ai font-heading text-sm font-bold text-white shadow-[0_6px_16px_-6px_rgba(194,65,12,0.7)]">
             L
           </span>
           <span className="font-heading text-[15px] font-semibold tracking-tight">

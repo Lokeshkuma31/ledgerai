@@ -25,7 +25,7 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   useEffect(() => setMounted(true), []);
 
   const { crumb, title } = getPageTitle(pathname ?? "/dashboard");
-  const currentTheme = mounted ? ((theme as Theme) ?? "dark") : "dark";
+  const currentTheme = mounted ? ((theme as Theme) ?? "light") : "light";
   const ThemeIcon = THEME_ICON[currentTheme];
 
   function cycleTheme() {

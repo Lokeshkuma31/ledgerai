@@ -22,6 +22,7 @@ test("sign-up redirects into the dashboard with the app shell rendered", async (
   await page.getByLabel("Name").fill("E2E Golden Path");
   await page.getByLabel("Email").fill(uniqueEmail);
   await page.getByLabel("Password").fill("golden-path-e2e-password");
+  await page.getByRole("checkbox").check();
 
   await page.getByRole("button", { name: /create account/i }).click();
 

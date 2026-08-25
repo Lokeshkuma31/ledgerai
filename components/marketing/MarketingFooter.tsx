@@ -27,7 +27,8 @@ export function MarketingFooter() {
               <span className="font-heading text-sm font-semibold">LedgerAI</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-foreground-subtle">
-              A hobby project exploring what an AI-native finance app could look like.
+              An AI-native finance copilot for people juggling tight budgets, split
+              expenses, and too many bank apps.
             </p>
             <a
               href="https://github.com/Lokeshkuma31/ledgerai"
@@ -80,7 +81,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="mt-12 flex flex-col gap-4 border-t border-border/60 pt-6 text-xs text-foreground-subtle sm:flex-row sm:items-center sm:justify-between">
-          <p>&copy; {new Date().getFullYear()} LedgerAI. Built as a personal/portfolio project.</p>
+          <p>&copy; {new Date().getFullYear()} LedgerAI. Open source, built by one developer.</p>
           <p>Next.js &middot; Prisma &middot; Neon &middot; Inngest &middot; Anthropic Claude</p>
         </div>
       </div>

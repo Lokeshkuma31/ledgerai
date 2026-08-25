@@ -25,6 +25,7 @@ function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   const login = useLogin();
   const signup = useSignup();
@@ -73,10 +74,26 @@ function SignInForm() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
+          {mode === "sign-up" && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={ageConfirmed}
+                onChange={(e) => setAgeConfirmed(e.target.checked)}
+                required
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+              I confirm I&apos;m 18 or older. LedgerAI connects real financial accounts and
+              isn&apos;t designed for use by minors.
+            </label>
+          )}
           {activeMutation.error && (
             <p className="text-sm text-destructive">{activeMutation.error.message}</p>
           )}
-          <Button type="submit" disabled={activeMutation.isPending}>
+          <Button
+            type="submit"
+            disabled={activeMutation.isPending || (mode === "sign-up" && !ageConfirmed)}
+          >
             {activeMutation.isPending ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
           </Button>
         </form>
